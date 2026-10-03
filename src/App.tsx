@@ -31,6 +31,8 @@ import { BuilderGuidance } from './components/BuilderGuidance';
 import { ProductionDetails } from './components/ProductionDetails';
 import { CharacterPlanner } from './components/CharacterPlanner';
 import { TemplatesWorkspace } from './components/TemplatesWorkspace';
+import { ProjectBackups } from './components/ProjectBackups';
+import { readProjectBackups, saveProjectBackup, type ProjectBackup } from './utils/projectBackups';
 import { applyStoryTemplate, type StoryTemplate } from './utils/storyTemplates';
 import { LocalPlanningDesk } from './components/LocalPlanningDesk';
 
@@ -187,8 +189,33 @@ export default function App() {
   const handleSurpriseMe=()=>suggestStarter(true);
   const appendStarter=()=>{if(!starterSuggestion)return;const next=normalizeStudioState({...presetState,storyIdea:[presetState.storyIdea,'Adapt this alternative idea to the established cast, setting, and era without replacing their explicit details: '+starterSuggestion.pick.starter.idea].filter(Boolean).join('\n\n')});setPresetState(next);setAutomaticFingerprint(null);if(starterSuggestion.generate)applyProduction(next);setStarterSuggestion(null);};
 
+  const [projectBackups, setProjectBackups] = useState<ProjectBackup[]>(() => {
+    try { return readProjectBackups(); } catch { return []; }
+  });
+  const backupCurrentProject = () => {
+    try {
+      setProjectBackups(saveProjectBackup({ draft: presetState, production: productionState, prompt: generatedPrompt, overrideText: manualOverride, hasGeneratedOnce }));
+      return true;
+    } catch {
+      showToast('Could not back up your project. Nothing was changed. Free browser storage or export your work before trying again.');
+      return false;
+    }
+  };
+  const handleRestoreProject = (project: ProjectBackup) => {
+    if (!backupCurrentProject()) return;
+    setPresetState(normalizeStudioState(project.draft));
+    setProductionState(normalizeStudioState(project.production));
+    setGeneratedPrompt(project.prompt);
+    setManualOverride(project.overrideText);
+    setHasGeneratedOnce(project.hasGeneratedOnce);
+    setAutomaticFingerprint(null);
+    setStarterSuggestion(null);
+    setActiveView('builder');
+    showToast('Project restored, including its output and edits. The project you left is backed up in Templates.');
+  };
   const handleApplyTemplate = (template: StoryTemplate, mode: 'fresh' | 'merge') => {
     const next = applyStoryTemplate(presetState, template, mode);
+    if (mode === 'fresh' && !backupCurrentProject()) return false;
     setPresetState(next);
     setAutomaticFingerprint(null);
     setStarterSuggestion(null);
@@ -199,7 +226,8 @@ export default function App() {
       setHasGeneratedOnce(false);
     }
     setActiveView(template.kind === 'characters' ? 'characters' : 'builder');
-    showToast(`Template “${template.title}” ${mode === 'fresh' ? 'loaded into a fresh draft' : 'merged into your draft'}. Generate when ready.`);
+    showToast(`Template “${template.title}” ${mode === 'fresh' ? 'loaded into a new project. Your previous project is backed up in Templates' : 'merged into your draft'}. Generate when ready.`);
+    return true;
   };
 
   // Reset Everything
@@ -428,6 +456,7 @@ export default function App() {
 
         <div hidden={activeView !== 'templates'}>
           <TemplatesWorkspace state={presetState} onApply={handleApplyTemplate} />
+          <ProjectBackups projects={projectBackups} onRestore={handleRestoreProject} />
         </div>
 
         {activeView === 'canvases' && (
