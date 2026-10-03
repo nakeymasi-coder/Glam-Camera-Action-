@@ -81,7 +81,27 @@ export interface OptionalStoryDetails {
   scene3Beat?: string;
 }
 
+export interface CharacterSceneLink {
+  scene: 1 | 2 | 3;
+  linked: boolean;
+  action: string;
+  emotion: string;
+}
+
+export interface StoryCharacter {
+  id: string;
+  name: string;
+  appearance: string;
+  goal: string;
+  startingEmotion: string;
+  endingEmotion: string;
+  relationships: string;
+  continuityNotes: string;
+  scenes: CharacterSceneLink[];
+}
+
 export interface PresetState {
+  characters?: StoryCharacter[];
   characterTypes: string[];
   customCharacter: string;
   genres: string[];

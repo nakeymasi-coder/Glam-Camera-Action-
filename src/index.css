@@ -242,7 +242,7 @@
 .gca-app [role=dialog] button,.gca-app [data-gca-panel=master] button { min-height:44px; }
 @media(max-width:720px) {
  .gca-planning-desk { padding:20px; }
- .gca-nav { grid-template-columns:repeat(3,minmax(0,1fr)); }
+ .gca-nav { grid-template-columns:repeat(2,minmax(0,1fr)); }
  .gca-nav button,.gca-nav button:first-child { white-space:normal; line-height:1.5; font-size:11px; gap:5px; padding:12px 5px; }
  .gca-app input,.gca-app textarea,.gca-app select { font-size:16px; }
  .gca-app [data-gca-panel=master]>div:nth-child(2) { flex-wrap:wrap; }

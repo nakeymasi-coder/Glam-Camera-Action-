@@ -14,6 +14,8 @@ import {
   ENERGY_TONE_OPTIONS as canonicalTones,
   type PresetState as CanonicalState,
 } from '../studio-core/promptEngine';
+import type { StoryCharacter } from '../types';
+import { normalizeCharacters, validateCharacters, characterIdentityContract, characterSceneContract } from './characterContinuity';
 import { buildDirectorPlan, type DirectorPlan } from '../studio-core/director-plan';
 import { buildCanvasPlan } from '../studio-core/canvas-plan';
 import { starterState } from '../studio-core/starter-state';
@@ -33,6 +35,7 @@ export const ENERGY_TONE_OPTIONS: string[] = canonicalTones.map(option => option
 
 /** Structural compatibility with the existing React/Vite application's state. */
 export interface PresetState {
+  characters?: StoryCharacter[];
   characterTypes: string[];
   customCharacter: string;
   genres: string[];
@@ -119,6 +122,7 @@ export function normalizeStudioState(saved?: unknown): PresetState {
   const source = object(saved);
   const details = object(source.optionalDetails);
   return {
+    characters: normalizeCharacters(source.characters),
     characterTypes: selection(source.characterTypes ?? source.characterType),
     customCharacter: stringValue(source.customCharacter),
     genres: selection(source.genres ?? source.genre),
@@ -211,6 +215,7 @@ export function parseProductionSnapshot(json: string): ProductionSnapshot {
     if (!Object.hasOwn(template, key)) throw new Error(`Unknown state field: ${key}`);
   }
   for (const [key, defaultValue] of Object.entries(template)) {
+    if (key === 'characters') { validateCharacters(state.characters); continue; }
     if (key === 'optionalDetails') continue;
     const item = state[key];
     if (Array.isArray(defaultValue)) {
@@ -271,7 +276,7 @@ function literalContract(snapshot: ProductionSnapshot): string {
     'The following text is supplemental user direction. It has NOT been interpreted into structured fields, runtime allocations, or a rewritten director plan. Where it changes those fields, edit the structured production snapshot and regenerate to synchronize the displayed plan. Preserve the literal text and follow explicit direction over automatic creative defaults.',
     snapshot.overrideText,
   ].join('\n\n') : '';
-  return [contract, override].filter(Boolean).join('\n\n');
+  return [contract, characterIdentityContract(state.characters || []), override].filter(Boolean).join('\n\n');
 }
 
 function canvasInput(state: CanonicalState): Record<string, unknown> {
@@ -313,10 +318,19 @@ export function createProduction(input?: unknown, overrideText?: string): Produc
       scene < 3 ? 'End with a clear action, discovery or changed state that motivates the next scene. Do not resolve a later beat early.' : 'Pay off the preceding change; do not reset props or undo character progress without an explicit story reason.',
     ].join('\n\n');
   };
+  const characters = snapshot.state.characters || [];
+  if (characters.length) {
+    directorPlan.continuity.push(characterIdentityContract(characters));
+    directorPlan.scenes = directorPlan.scenes.map(scene => ({ ...scene, storyCue: [scene.storyCue, characterSceneContract(characters, scene.scene)].filter(Boolean).join('\n\n') }));
+  }
   const hasBeats = beats.some(beat => beat?.trim());
+  const specificDirection = (scene: number) => [
+    hasBeats ? sceneDirection(scene) : '', characterSceneContract(characters, scene),
+  ].filter(Boolean).join('\n\n');
+  const masterArcs = [1, 2, 3].map(specificDirection).filter(Boolean).join('\n\n');
   return {
     snapshot,
-    prompt: append(generateMasterPrompt(canonical)) + (hasBeats ? '\n\n' + [1, 2, 3].map(sceneDirection).join('\n\n') : ''),
+    prompt: append(generateMasterPrompt(canonical)) + (masterArcs ? '\n\n' + masterArcs : ''),
     directorPlan,
     canvases: plan.canvases.map(canvas => ({
       id: canvas.number,
@@ -325,7 +339,7 @@ export function createProduction(input?: unknown, overrideText?: string): Produc
       title: canvas.title,
       sceneIndex: canvas.scene as 1 | 2 | 3,
       purpose: canvas.role,
-      content: append(canvas.instructions) + (hasBeats ? '\n\n' + sceneDirection(canvas.scene) : ''),
+      content: append(canvas.instructions) + (specificDirection(canvas.scene) ? '\n\n' + specificDirection(canvas.scene) : ''),
     })),
     notice: 'Local structured planning templates, not AI-written finished scenes or rendered images. The versioned production snapshot is the shared source for the master prompt, six canvases, and director plan.' +
       (snapshot.overrideText.trim() ? ' Literal override text is included in the master prompt and all six canvases; it is not parsed into the displayed director plan. Edit the structured snapshot for synchronized runtime, cast, or story changes.' : ''),

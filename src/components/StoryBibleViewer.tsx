@@ -1,5 +1,6 @@
 import React from 'react';
 import { PRODUCTION_FIELDS } from './ProductionDetails';
+import { CharacterPlanner } from './CharacterPlanner';
 import { CHARACTER_TYPE_HELPERS } from '../studio-core/promptEngine';
 import { PresetState } from '../types';
 import { CHARACTER_CREATIVE_BEHAVIORS } from '../data/presetsData';
@@ -94,6 +95,8 @@ export const StoryBibleViewer: React.FC<StoryBibleViewerProps> = ({ state }) => 
           </div>
         </div>
       </div>
+
+      <CharacterPlanner state={state} />
 
       {/* Specific Story Parameters */}
       <div className="bg-white rounded-xl border border-neutral-200/90 shadow-sm p-5">
