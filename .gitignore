@@ -7,3 +7,5 @@ coverage/
 *.log
 .env*
 !.env.example
+dist-base44/
+base44/.app.jsonc

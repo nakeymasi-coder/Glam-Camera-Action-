@@ -1,0 +1,9 @@
+{
+  "name": "Glam, Camera, Action!",
+  "description": "Browser-local story planning, character continuity, canvases and reusable templates.",
+  "site": {
+    "installCommand": "bun install --frozen-lockfile",
+    "buildCommand": "npm run build:base44",
+    "outputDirectory": "dist-base44"
+  }
+}

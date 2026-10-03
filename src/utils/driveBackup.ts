@@ -3,8 +3,12 @@ import type { DriveBackupInput, DriveBackupResult, DriveBackupStatus } from './d
 import { DRIVE_NOT_CONFIGURED } from './driveBackupTypes';
 export type { DriveBackupInput, DriveBackupResult, DriveBackupStatus } from './driveBackupTypes';
 
+// Base44 serves the SPA without the optional Express Drive endpoints.
+// This public build flag contains no credentials; normal server builds keep using the adapter.
+const driveBackupDisabled = import.meta.env.VITE_DRIVE_BACKUP_DISABLED === 'true';
+const staticDriveStatus = (): DriveBackupStatus => ({ configured: false, connected: false, message: 'Google Drive backup is unavailable in this Base44-hosted version. Private Drive setup is pending. Your local saves still work.' });
 export interface DriveBackupView { status: DriveBackupStatus | null; result: DriveBackupResult | null; busy: boolean; }
-let view: DriveBackupView = { status: null, result: null, busy: false };
+let view: DriveBackupView = { status: driveBackupDisabled ? staticDriveStatus() : null, result: null, busy: false };
 let epoch = 0;
 let owner = auth.currentUser?.uid || null;
 const listeners = new Set<(view: DriveBackupView) => void>();
@@ -23,10 +27,11 @@ export function cancelPendingDriveBackups() {
   publish({ result: null, busy: false });
 }
 onAuthStateChanged(auth, user => {
-  if ((user?.uid || null) !== owner) { cancelPendingDriveBackups(); owner = user?.uid || null; publish({ status: null, result: null }); }
+  if ((user?.uid || null) !== owner) { cancelPendingDriveBackups(); owner = user?.uid || null; publish({ status: driveBackupDisabled ? staticDriveStatus() : null, result: null }); }
 });
 const sameOwner = (uid: string | null, version: number) => version === epoch && (auth.currentUser?.uid || null) === uid;
 async function api(path: string, method: 'GET' | 'POST', uid: string | null, version: number, data?: unknown) {
+  if (driveBackupDisabled) throw Error(staticDriveStatus().message);
   const user = auth.currentUser;
   if ((user?.uid || null) !== uid || version !== epoch) throw Error('Drive request cancelled.');
   const token = user ? await user.getIdToken() : undefined;
@@ -43,6 +48,11 @@ async function api(path: string, method: 'GET' | 'POST', uid: string | null, ver
   } finally { clearTimeout(timer); active.delete(controller); }
 }
 export async function getDriveBackupStatus(): Promise<DriveBackupStatus> {
+  if (driveBackupDisabled) {
+    const status = staticDriveStatus();
+    publish({ status });
+    return status;
+  }
   const uid = auth.currentUser?.uid || null;
   const version = epoch;
   const status = await api('status', 'GET', uid, version) as DriveBackupStatus;
@@ -50,6 +60,7 @@ export async function getDriveBackupStatus(): Promise<DriveBackupStatus> {
   return status;
 }
 export async function connectDriveBackup(): Promise<void> {
+  if (driveBackupDisabled) throw Error(staticDriveStatus().message);
   if (!auth.currentUser) throw Error('Use Sign in with Google first, then connect Drive.');
   const uid = auth.currentUser.uid, version = epoch;
   const status = await getDriveBackupStatus();
@@ -61,6 +72,7 @@ export async function connectDriveBackup(): Promise<void> {
 }
 export async function disconnectDriveBackup(): Promise<DriveBackupStatus> {
   cancelPendingDriveBackups();
+  if (driveBackupDisabled) return getDriveBackupStatus();
   const uid = auth.currentUser?.uid || null, version = epoch;
   await getDriveBackupStatus();
   const status = await api('disconnect', 'POST', uid, version, {}) as DriveBackupStatus;
@@ -69,6 +81,12 @@ export async function disconnectDriveBackup(): Promise<DriveBackupStatus> {
 }
 /** Call only AFTER the requested local Save succeeds. Explicit Save only, never on edits. */
 export function enqueueDriveBackup(input: DriveBackupInput): Promise<DriveBackupResult> {
+  if (driveBackupDisabled) {
+    const status = staticDriveStatus();
+    const result: DriveBackupResult = { status: 'not-configured', message: status.message };
+    publish({ status, result, busy: false });
+    return Promise.resolve(result);
+  }
   const uid = auth.currentUser?.uid || null;
   const version = epoch;
   // A task owns an immutable saved snapshot and the authenticated user at Save time.

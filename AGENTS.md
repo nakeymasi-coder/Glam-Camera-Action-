@@ -13,3 +13,4 @@
 
 - Production build combines Vite output with an esbuild ESM `server.js` bundle in the repository root. Keep `server.js` next to `dist/`; `npm start` runs this bundle directly. Run `npm run test:production` after building to verify key-free startup and removed APIs. Unknown `/api` paths return JSON 404 before SPA fallback.
 - Use `createLocalId` for new browser-local IDs. It preserves UUIDv4 format and uses Web Crypto `getRandomValues` when `randomUUID` is unavailable on an HTTP LAN preview; do not migrate existing IDs.
+- `base44/config.jsonc` is a site-only hosting configuration for the existing Firebase-backed app, not a request to scaffold or replace its backend. `npm run build:base44` emits `dist-base44/` with Drive explicitly pending/unavailable. Only use approved site-only publication; do not run all-resource Base44 deploy, enable shared Drive connectors, or replace Firebase.

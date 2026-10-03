@@ -10,3 +10,6 @@ coverage
 .DS_Store
 docs
 tests
+
+dist-base44
+base44/.app.jsonc
