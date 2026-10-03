@@ -5,7 +5,7 @@ services:
     volumes:
       - .:/app
       - dependencies:/app/node_modules
-    command: ["sh", "-ec", "npm install --global bun@1.4.2 && bun install --frozen-lockfile && exec node --import tsx --watch-path=server.ts server.ts"]
+    command: ["sh", "-ec", "npm install --global bun@1.4.2 && bun install --frozen-lockfile && exec env -u GEMINI_API_KEY node --import tsx --watch-path=server.ts server.ts"]
     ports:
       - "3000:3000"
     environment:

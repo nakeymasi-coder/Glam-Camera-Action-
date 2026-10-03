@@ -19,6 +19,11 @@ async function startServer() {
   // Optional private Drive backup is fail-closed until secure server configuration.
   app.use('/api/drive', await createDriveBackupRouter());
 
+  // Unknown/removed APIs must never fall through to the SPA success response.
+  app.use('/api', (_req: Request, res: Response) => {
+    res.status(404).json({ error: 'API endpoint is not available in this local planner.' });
+  });
+
   // Planning is browser-local. No AI provider clients, credentials or paid endpoints.
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');

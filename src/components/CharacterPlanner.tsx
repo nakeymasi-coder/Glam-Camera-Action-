@@ -3,6 +3,7 @@ import { Columns3, List } from 'lucide-react';
 import { StoryKanban } from './StoryKanban';
 import type { PresetState, StoryCharacter } from '../types';
 import { CHARACTER_FIELDS, SCENES, incomingCharacterEmotion, normalizeCharacters, sceneBeat } from '../utils/characterContinuity';
+import { createLocalId } from '../utils/projectIds';
 
 const inputStyle = 'w-full rounded-lg border border-neutral-300 bg-white p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C99C62]';
 export function CharacterPlanner({ state, onChange }: { state: PresetState; onChange?: (state: PresetState) => void }) {
@@ -13,7 +14,7 @@ export function CharacterPlanner({ state, onChange }: { state: PresetState; onCh
   return <section aria-label="Character planner" className="space-y-5">
     <div className="gca-brief rounded-xl border border-neutral-200 bg-white p-4 sm:p-6">
       <div className="flex flex-wrap justify-between items-center gap-3"><div><h2 className="text-lg font-bold">Characters & story arcs</h2><p className="text-xs text-neutral-600 mt-2">{characters.length} characters · one shared cast for the entire production</p></div>
-        {onChange && <button type="button" className="rounded-lg bg-neutral-900 text-white px-4 py-2 text-sm font-semibold" onClick={() => { onChange({ ...state, characters: [...characters, ...normalizeCharacters([{ id: crypto.randomUUID() }])] }); setView('list'); }}>Add character</button>}
+        {onChange && <button type="button" className="rounded-lg bg-neutral-900 text-white px-4 py-2 text-sm font-semibold" onClick={() => { onChange({ ...state, characters: [...characters, ...normalizeCharacters([{ id: createLocalId() }])] }); setView('list'); }}>Add character</button>}
       </div>
       <p className="text-sm text-neutral-600 mt-3">Link each character to the existing three scene events. Identity stays shared; actions and emotional changes apply only to linked scenes. These notes guide local prompts, not an AI continuity audit.</p>
       <div role="group" aria-label="Character view" className="mt-4 inline-flex rounded-lg border border-neutral-300 bg-neutral-50 p-1 gap-1">

@@ -20,12 +20,11 @@ FROM ${NODE_IMAGE} AS runtime
 WORKDIR /app
 ENV NODE_ENV=production PORT=3000
 COPY --from=production-dependencies --chown=node:node /app/node_modules ./node_modules
-COPY --chown=node:node package.json tsconfig.json server.ts ./
-COPY --chown=node:node server ./server
-COPY --chown=node:node src ./src
+COPY --chown=node:node package.json ./
+COPY --from=build --chown=node:node /app/server.js ./server.js
 COPY --chown=node:node scripts ./scripts
 COPY --from=build --chown=node:node /app/dist ./dist
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD ["node", "scripts/healthcheck.mjs"]
-CMD ["node", "--import", "tsx", "server.ts"]
+CMD ["node", "server.js"]

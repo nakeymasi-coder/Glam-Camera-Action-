@@ -27,10 +27,11 @@ On a Linux/POSIX Node host:
 bun install --frozen-lockfile
 npm run build:production
 npm test
+npm run test:production
 npm start
 ```
 
-`build:production` type-checks and builds `dist`. `npm start` explicitly enables production and loads TypeScript through `tsx`, which is a production dependency. Build before starting; startup fails if `dist/index.html` is absent. Uploading only `dist` is insufficient for this full-stack app: the Node server, its backend imports, and production dependencies must be present.
+`build:production` type-checks, builds `dist`, and bundles the server into `server.js`. `npm start` explicitly enables production and runs the compiled server with Node. Build before starting; startup fails if `dist/index.html` is absent. Uploading only `dist` is insufficient: keep `server.js`, `dist`, `package.json`, and installed production dependencies together. The runtime does not need source TypeScript or a TypeScript loader.
 
 For a custom port, set `PORT` in the host environment. With the server running, `npm run healthcheck` checks the matching `PORT` (default 3000). `npm run preview` is a Vite static-preview convenience, not the deployment server and does not provide the Drive API.
 
@@ -53,4 +54,4 @@ If private Drive backups will be enabled, first follow `DRIVE_BACKUP.md`: obtain
 
 ## Validation status
 
-Type-check and production build passed in this workspace. A direct Node production smoke test passed for the home page, a SPA deep link, status-only `/healthz`, and disabled Drive status; invalid `PORT` was rejected. Docker and Bun are not installed in the current execution environment, so a fresh frozen-lock install, Docker image build and container startup still require validation on the selected build host. Existing dependencies are used for the local Node checks; those checks do not prove a clean dependency installation.
+The integrated source is checked with a fresh Bun 1.4.2 frozen-lockfile installation, type checking, automated story/backup tests, production build, and `test:production`. The runtime test launches compiled `server.js` with a clean environment and outbound requests blocked; it checks home/assets/deep links, status-only health, disabled Drive, absent provider APIs, invalid ports, and missing build output. Docker is not installed in this execution environment, so the Docker image build and container startup must still be verified on the selected build host. Real Firebase login and private Drive OAuth were not exercised; no credentials were created.

@@ -1,5 +1,6 @@
 import type { PresetState } from '../types';
 import { normalizeStudioState, parseProductionSnapshot } from './studioAdapter';
+import { createLocalId } from './projectIds';
 
 export const TEMPLATE_TYPES = {
   structure: 'Story structure',
@@ -205,7 +206,7 @@ const joinNotes = (current: string, incoming: string) => !incoming.trim() || cur
 /** Merge keeps existing text, adds template notes and creates independent cast ids. */
 export function applyStoryTemplate(current: PresetState, template: StoryTemplate, mode: 'fresh' | 'merge'): PresetState {
   const incoming = normalizeStudioState(template.state);
-  incoming.characters = incoming.characters?.map(c => ({ ...c, id: crypto.randomUUID() }));
+  incoming.characters = incoming.characters?.map(c => ({ ...c, id: createLocalId() }));
   if (mode === 'fresh') return incoming;
   const next = normalizeStudioState(current);
   next.characters = [...(next.characters || []), ...(incoming.characters || [])];

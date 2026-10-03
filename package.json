@@ -5,20 +5,19 @@
   "type": "module",
   "scripts": {
     "dev": "NODE_ENV=development node --import tsx --watch-path=server.ts server.ts",
-    "start": "NODE_ENV=production node --import tsx server.ts",
-    "build": "vite build",
+    "start": "NODE_ENV=production node server.js",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=esm --packages=external --outfile=server.js",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "test": "node --import tsx --test tests/*.test.ts tests/*.test.tsx && node --import tsx tests/production-regressions.mts",
     "build:production": "npm run lint && npm run build",
-    "healthcheck": "node scripts/healthcheck.mjs"
+    "healthcheck": "node scripts/healthcheck.mjs",
+    "test:production": "node --test tests/production-runtime.test.mjs"
   },
   "dependencies": {
-    "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.1",
-    "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "firebase": "^12.19.0",
     "lucide-react": "^0.546.0",
@@ -26,7 +25,6 @@
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "vite": "^8.3.0",
-    "ws": "^8.22.0",
     "tsx": "^4.21.0"
   },
   "devDependencies": {
@@ -34,7 +32,6 @@
     "@types/node": "^22.14.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@types/ws": "^8.18.2",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
     "tailwindcss": "^4.3.3",

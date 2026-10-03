@@ -36,6 +36,7 @@ import { readProjectBackups, saveProjectBackup, type ProjectBackup } from './uti
 import { applyStoryTemplates, type StoryTemplate } from './utils/storyTemplates';
 import { DriveBackupPanel } from './components/DriveBackupPanel';
 import { enqueueDriveBackup } from './utils/driveBackup';
+import { createLocalId } from './utils/projectIds';
 import { LocalPlanningDesk } from './components/LocalPlanningDesk';
 
 import { Header } from './components/Header';
@@ -59,7 +60,7 @@ const mergeOptions=(core:string[],legacy:string[])=>['None',...Array.from(new Se
 const DRAFT_STORAGE_KEY = 'scene_script_draft_state_v1';
 const LIBRARY_STORAGE_KEY = 'scene_script_library_v1';
 const PROJECT_ID_KEY = 'scene_script_project_id_v1';
-const newProjectId = () => crypto.randomUUID();
+const newProjectId = createLocalId;
 const safeProjectId = (value: unknown) => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(value) && !['__proto__', 'constructor', 'prototype'].includes(value) ? value : newProjectId();
 const readProjectId = () => { try { const value = localStorage.getItem(PROJECT_ID_KEY); return safeProjectId(value); } catch { return newProjectId(); } };
 
@@ -283,7 +284,7 @@ export default function App() {
   const handleSavePrompt = (title: string) => {
     const currentPrompt = generatedPrompt || buildMasterPrompt(presetState);
     const newItem: SavedPromptItem = {
-      id: crypto.randomUUID(),
+      id: createLocalId(),
       projectId,
       title,
       createdAt: new Date().toISOString(),

@@ -1,4 +1,5 @@
 import type { PresetState } from '../types';
+import { createLocalId } from './projectIds';
 
 export const PROJECT_BACKUPS_KEY = 'scene_script_project_backups_v1';
 export interface ProjectBackup {
@@ -25,7 +26,7 @@ export function readProjectBackups(): ProjectBackup[] {
 export function saveProjectBackup(project: Omit<ProjectBackup, 'id' | 'title' | 'createdAt'>): ProjectBackup[] {
   const backup: ProjectBackup = {
     ...project,
-    id: crypto.randomUUID(),
+    id: createLocalId(),
     title: project.draft.storyIdea.trim().slice(0, 80) || 'Untitled project',
     createdAt: new Date().toISOString(),
   };
