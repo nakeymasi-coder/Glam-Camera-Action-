@@ -4,16 +4,10 @@ import { Camera, FileText, Copy, Check, Sparkles, Layers } from 'lucide-react';
 
 interface SixCanvasInspectorProps {
   canvases: CanvasItem[];
-  onGenerateImage?: (prompt: string) => void;
-  onAnimateVideo?: (prompt: string) => void;
-  onGenerateVoice?: (text: string) => void;
 }
 
 export const SixCanvasInspector: React.FC<SixCanvasInspectorProps> = ({
   canvases,
-  onGenerateImage,
-  onAnimateVideo,
-  onGenerateVoice,
 }) => {
   const [copiedCanvasId, setCopiedCanvasId] = useState<number | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<'all' | '1' | '2' | '3'>('all');
@@ -39,13 +33,13 @@ export const SixCanvasInspector: React.FC<SixCanvasInspectorProps> = ({
               <span className="font-mono text-xs font-bold text-black bg-[#C99C62] px-2 py-0.5 rounded">
                 6-Canvas Production Architecture
               </span>
-              <span className="text-xs text-[#8A5036] font-bold">ChatGPT Canvas Spec</span>
+              <span className="text-xs text-[#8A5036] font-bold">Local Planning Spec</span>
             </div>
             <h2 className="text-lg sm:text-xl font-bold text-neutral-900 tracking-tight">
               Sequential Production Breakdown
             </h2>
             <p className="text-xs sm:text-sm text-neutral-500 mt-1 max-w-2xl">
-              Six linked planning canvases from the same production snapshot. These are detailed prompts and script instructions, not finished images or newly AI-written dialogue. Use the optional AI tools only when you choose.
+              Six linked planning canvases from the same production snapshot. These are detailed prompts and script instructions, not finished images or newly AI-written dialogue. Generated entirely in your browser using local planning templates.
             </p>
           </div>
 
@@ -167,7 +161,7 @@ export const SixCanvasInspector: React.FC<SixCanvasInspectorProps> = ({
                 </div>
               </div>
 
-              {/* Bottom rule tag & AI Action Buttons */}
+              {/* Bottom rule tag */}
               <div className="px-4 py-2.5 bg-neutral-50 border-t border-neutral-200 text-[10px] text-neutral-500 flex flex-wrap items-center justify-between gap-2">
                 <span className="truncate max-w-[220px]">
                   {isImage
@@ -178,37 +172,6 @@ export const SixCanvasInspector: React.FC<SixCanvasInspectorProps> = ({
                 </span>
 
                 <div className="flex items-center gap-1.5 ml-auto">
-                  {isImage && onGenerateImage && (
-                    <button
-                      type="button"
-                      onClick={() => onGenerateImage(canvas.content)}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded bg-[#C99C62] hover:bg-[#B98A4D] text-black font-bold text-[11px] transition-colors shadow-2xs"
-                      title="Generate this image with Gemini 3.1 Flash"
-                    >
-                      <Camera className="w-3 h-3" />
-                      <span>Create Visual</span>
-                    </button>
-                  )}
-                  {isImage && onAnimateVideo && (
-                    <button
-                      type="button"
-                      onClick={() => onAnimateVideo(canvas.content)}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded bg-[#8A5036] hover:bg-amber-700 text-white font-bold text-[11px] transition-colors shadow-2xs"
-                      title="Animate this scene with Veo 3.1"
-                    >
-                      <span>Veo Video</span>
-                    </button>
-                  )}
-                  {!isImage && onGenerateVoice && (
-                    <button
-                      type="button"
-                      onClick={() => onGenerateVoice(canvas.content)}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded bg-neutral-900 hover:bg-neutral-800 text-white font-medium text-[11px] transition-colors shadow-2xs"
-                      title="Listen with Gemini TTS"
-                    >
-                      <span>Voice Over</span>
-                    </button>
-                  )}
                   <span className="font-mono text-neutral-400 pl-1">#{canvas.canvasNumber}</span>
                 </div>
               </div>

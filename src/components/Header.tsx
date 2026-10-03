@@ -8,17 +8,13 @@ interface HeaderProps {
   onOpenExamples: () => void;
   activeView: 'builder' | 'canvases' | 'bible' | 'chat';
   setActiveView: (view: 'builder' | 'canvases' | 'bible' | 'chat') => void;
-  onOpenImageStudio: () => void;
-  onOpenVeoVideo: () => void;
-  onOpenMusicStudio: () => void;
-  onOpenLiveVoice: () => void;
   currentStory?: any;
   onToast: (msg: string) => void;
   onSyncCloudStories?: (stories: any[]) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ savedCount, onOpenLibrary, onOpenExamples, activeView, setActiveView, currentStory, onToast, onSyncCloudStories }) => {
-  const views = [ ['builder','01','Story builder'], ['canvases','02','6-Canvas Flow'], ['bible','03','Story Bible'], ['chat','04','AI Director'] ] as const;
+  const views = [ ['builder','01','Story builder'], ['canvases','02','6-Canvas Flow'], ['bible','03','Story Bible'], ['chat','04','Local Director'] ] as const;
   return <header className="gca-header">
     <div className="gca-header-top">
       <button className="gca-wordmark" onClick={() => setActiveView('builder')} aria-label="Glam, Camera, Action! Home">

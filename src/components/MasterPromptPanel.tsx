@@ -40,7 +40,7 @@ export const MasterPromptPanel: React.FC<MasterPromptPanelProps> = ({
         <div className="flex items-center gap-2.5">
           <div className="w-2.5 h-2.5 rounded-full bg-[#C99C62]" />
           <h2 className="text-sm sm:text-base font-bold tracking-tight">
-            Generated ChatGPT Master Prompt
+            Local Master Story Prompt
           </h2>
           <span className="text-[11px] font-mono text-neutral-400 border border-neutral-700 px-2 py-0.5 rounded">
             Editable Canvas Engine
@@ -108,7 +108,7 @@ export const MasterPromptPanel: React.FC<MasterPromptPanelProps> = ({
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-[#C99C62] shrink-0 fill-current" />
           <span>
-            <strong>ChatGPT Canvas Ready:</strong> You can edit directly below before copying. Paste into ChatGPT to produce all 6 canvases in exact sequence.
+            <strong>Local Planning Template:</strong> Edit, copy, or export your prompt. The 6-Canvas Flow shows coordinated image and script instructions, not rendered media or AI-written scenes.
           </span>
         </div>
         <div className="font-mono text-[11px] text-amber-800 shrink-0">

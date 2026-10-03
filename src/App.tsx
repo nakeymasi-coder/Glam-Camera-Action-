@@ -27,7 +27,6 @@ import {
 } from './data/presetsData';
 import { buildMasterPrompt, createProduction, normalizeStudioState, createLocalStarterRotation, CHARACTER_TYPE_OPTIONS as STUDIO_CHARACTERS, STORY_GENRE_OPTIONS as STUDIO_GENRES, VISUAL_STYLE_OPTIONS as STUDIO_STYLES, VIDEO_FORMAT_OPTIONS as STUDIO_FORMATS, ENERGY_TONE_OPTIONS as STUDIO_TONES } from './utils/studioAdapter';
 import { CreativeBriefFields } from './components/CreativeBriefFields';
-import { speakScript } from './services/geminiService';
 
 import { Header } from './components/Header';
 import { StepPresetCard } from './components/StepPresetCard';
@@ -42,25 +41,15 @@ import { ResetConfirmDialog } from './components/ResetConfirmDialog';
 import { SavePromptDialog } from './components/SavePromptDialog';
 import { ExamplesModal } from './components/ExamplesModal';
 
-// AI Studio Feature Modals & Chat
 import { AiDirectorChat } from './components/AiDirectorChat';
-import { ImageStudioModal } from './components/ImageStudioModal';
-import { VeoVideoModal } from './components/VeoVideoModal';
-import { MusicStudioModal } from './components/MusicStudioModal';
-import { LiveVoiceDirectorModal } from './components/LiveVoiceDirectorModal';
 
 import {
   Sparkles,
   ArrowDownRight,
   HardDrive,
-  Image as ImageIcon,
   Film,
-  Music,
-  Radio,
   MessageSquare,
   Wand2,
-  Volume2,
-  Loader2,
   CheckCircle,
 } from 'lucide-react';
 
@@ -115,21 +104,6 @@ export default function App() {
   const [isExamplesOpen, setIsExamplesOpen] = useState(false);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
-
-  // AI Studio Modals
-  const [isImageStudioOpen, setIsImageStudioOpen] = useState(false);
-  const [isVeoVideoOpen, setIsVeoVideoOpen] = useState(false);
-  const [isMusicStudioOpen, setIsMusicStudioOpen] = useState(false);
-  const [isLiveVoiceOpen, setIsLiveVoiceOpen] = useState(false);
-
-  const [activeImageStudioPrompt, setActiveImageStudioPrompt] = useState('');
-  const [activeVeoImage, setActiveVeoImage] = useState<string | null>(null);
-  const [activeVeoPrompt, setActiveVeoPrompt] = useState('');
-  const [activeMusicPrompt, setActiveMusicPrompt] = useState('');
-
-  // TTS audio player state
-  const [ttsAudioUrl, setTtsAudioUrl] = useState<string | null>(null);
-  const [isTtsLoading, setIsTtsLoading] = useState(false);
 
   // Status toast message
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -288,41 +262,6 @@ export default function App() {
     showToast(`Synced ${cloudStories.length} cloud stories from Firebase Firestore!`);
   };
 
-  // Open Image Studio with specific prompt
-  const handleOpenImageStudioForScene = (promptText: string) => {
-    setActiveImageStudioPrompt(promptText);
-    setIsImageStudioOpen(true);
-  };
-
-  // Open Veo Video Animator with prompt/image
-  const handleOpenVeoForScene = (promptText: string) => {
-    setActiveVeoPrompt(promptText);
-    setActiveVeoImage(null);
-    setIsVeoVideoOpen(true);
-  };
-
-  // Bridge from Image Studio to Veo Animator
-  const handleSendImageToVeo = (imageUrl: string, promptText: string) => {
-    setActiveVeoImage(imageUrl);
-    setActiveVeoPrompt(promptText);
-    setIsVeoVideoOpen(true);
-  };
-
-  // Voice script with TTS
-  const handleVoiceScript = async (text: string) => {
-    setIsTtsLoading(true);
-    try {
-      const res = await speakScript({ text });
-      setTtsAudioUrl(res.audioUrl);
-      showToast('Speech synthesized with Gemini 3.8 Flash TTS!');
-    } catch (e: any) {
-      console.error(e);
-      showToast(`TTS error: ${e.message || 'Speech synthesis failed'}`);
-    } finally {
-      setIsTtsLoading(false);
-    }
-  };
-
   const activeCharType = presetState.characterTypes.find((t) => t !== 'None') || '';
   const characterHelperText = activeCharType ? CHARACTER_CREATIVE_BEHAVIORS[activeCharType] : undefined;
 
@@ -353,20 +292,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Floating Audio Player for TTS if playing */}
-      {ttsAudioUrl && (
-        <div className="fixed bottom-24 right-6 z-40 bg-neutral-900 text-white p-3 rounded-xl shadow-2xl border border-neutral-700 flex items-center gap-3">
-          <Volume2 className="w-4 h-4 text-[#C99C62]" />
-          <audio src={ttsAudioUrl} controls autoPlay className="h-8 max-w-[220px]" />
-          <button
-            onClick={() => setTtsAudioUrl(null)}
-            className="text-xs text-neutral-400 hover:text-white"
-          >
-            &times;
-          </button>
-        </div>
-      )}
-
       {/* Top Header */}
       <Header
         savedCount={savedLibrary.length}
@@ -374,10 +299,6 @@ export default function App() {
         onOpenExamples={() => setIsExamplesOpen(true)}
         activeView={activeView}
         setActiveView={setActiveView}
-        onOpenImageStudio={() => setIsImageStudioOpen(true)}
-        onOpenVeoVideo={() => setIsVeoVideoOpen(true)}
-        onOpenMusicStudio={() => setIsMusicStudioOpen(true)}
-        onOpenLiveVoice={() => setIsLiveVoiceOpen(true)}
         currentStory={currentStoryObject}
         onToast={showToast}
         onSyncCloudStories={handleSyncCloudStories}
@@ -392,20 +313,20 @@ export default function App() {
           <div className="gca-sequence" aria-label="Production structure"><span>01 <b>THE IDEA</b></span><i aria-hidden="true"/><span>03 <b>SCENES</b></span><i aria-hidden="true"/><span>06 <b>CANVASES</b></span></div>
         </div>
         <div className="gca-toolbox">
-          <div className="gca-toolbox-heading"><span>THE PRODUCTION DESK</span><span>AI TOOLS</span></div>
+          <div className="gca-toolbox-heading"><span>THE PRODUCTION DESK</span><span>LOCAL TOOLS</span></div>
           <div className="gca-tool-grid">
-            <button onClick={() => setIsImageStudioOpen(true)}><ImageIcon size={22} strokeWidth={1.5}/><span><b>Image studio</b><small>Create &amp; edit images</small></span><span aria-hidden="true">↗</span></button>
-            <button onClick={() => setIsVeoVideoOpen(true)}><Film size={22} strokeWidth={1.5}/><span><b>Video studio</b><small>Animate with Veo</small></span><span aria-hidden="true">↗</span></button>
-            <button onClick={() => setIsMusicStudioOpen(true)}><Music size={22} strokeWidth={1.5}/><span><b>Music studio</b><small>Score with Lyria</small></span><span aria-hidden="true">↗</span></button>
-            <button onClick={() => setIsLiveVoiceOpen(true)}><Radio size={22} strokeWidth={1.5}/><span><b>Live voice</b><small>Talk through direction</small></span><span aria-hidden="true">↗</span></button>
+            <button onClick={() => setActiveView('builder')}><Wand2 size={22} strokeWidth={1.5}/><span><b>Story builder</b><small>Shape your creative brief</small></span><span aria-hidden="true">↗</span></button>
+            <button onClick={() => setActiveView('canvases')}><Film size={22} strokeWidth={1.5}/><span><b>Six canvases</b><small>Image &amp; script prompts</small></span><span aria-hidden="true">↗</span></button>
+            <button onClick={() => setActiveView('bible')}><HardDrive size={22} strokeWidth={1.5}/><span><b>Story bible</b><small>Keep every detail connected</small></span><span aria-hidden="true">↗</span></button>
+            <button onClick={() => setIsLibraryOpen(true)}><CheckCircle size={22} strokeWidth={1.5}/><span><b>Prompt library</b><small>Save &amp; load in this browser</small></span><span aria-hidden="true">↗</span></button>
           </div>
-          <button className="gca-director-link" onClick={() => setActiveView('chat')}><MessageSquare size={17}/> Open AI Director <span aria-hidden="true">→</span></button>
-          <p>Provider tools may require paid credits.<br/>Local story planning is always available.</p>
+          <button className="gca-director-link" onClick={() => setActiveView('chat')}><MessageSquare size={17}/> Open Local Director <span aria-hidden="true">→</span></button>
+          <p>Client-side templates and rule-based guidance.<br/>No AI service, API key, or paid credits.</p>
         </div>
       </section>
 
       <div className="gca-notices max-w-6xl mx-auto w-full px-4 sm:px-6 pt-3 text-xs text-neutral-600">
-        <p>Prompt planning runs locally. Image, video, music, voice and Director AI tools use separate provider services and may require paid credits.</p>
+        <p>Planning and director guidance run locally using templates and rules. Firebase sign-in and optional cloud storage remain available.</p>
         {hasGeneratedOnce&&<p className="mt-2">{production.notice}</p>}
         {briefChanged&&<p role="status" className="mt-2 rounded-lg bg-amber-50 border border-amber-200 p-3 text-amber-950">Your brief has changed. Generate again to update the master prompt, shot direction and six canvases together. Saving keeps the settings used for the current output.</p>}
         {manualOverride&&<p className="mt-2 rounded-lg bg-amber-50 border border-amber-200 p-3 text-neutral-800">Manual prompt edits are carried verbatim into every scene as priority direction. The app does not automatically interpret arbitrary prose into the structured fields. Rebuild from fields to replace this override.</p>}
@@ -502,9 +423,6 @@ export default function App() {
         {activeView === 'canvases' && (
           <SixCanvasInspector
             canvases={sixCanvases}
-            onGenerateImage={handleOpenImageStudioForScene}
-            onAnimateVideo={handleOpenVeoForScene}
-            onGenerateVoice={handleVoiceScript}
           />
         )}
 
@@ -517,10 +435,10 @@ export default function App() {
             <div className="bg-white rounded-xl border border-neutral-200 p-4 shadow-sm flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold text-neutral-900">
-                  AI Story Director &amp; Script Doctor
+                  Local Story Director
                 </h2>
                 <p className="text-xs text-neutral-500">
-                  Powered by <code className="font-mono text-neutral-700">gemini-3.5-flash</code> with Google Search Grounding &amp; <code className="font-mono text-neutral-700">gemini-3.1-pro-preview</code>
+                  Rule-based planning checklists, not AI chat or factual web research.
                 </p>
               </div>
               <button
@@ -584,31 +502,7 @@ export default function App() {
         }
       />
 
-      {/* AI Studio Feature Modals */}
-      <ImageStudioModal
-        isOpen={isImageStudioOpen}
-        onClose={() => setIsImageStudioOpen(false)}
-        defaultPrompt={activeImageStudioPrompt || presetState.storyIdea}
-        onSendToVeo={handleSendImageToVeo}
-      />
 
-      <VeoVideoModal
-        isOpen={isVeoVideoOpen}
-        onClose={() => setIsVeoVideoOpen(false)}
-        initialImage={activeVeoImage}
-        initialPrompt={activeVeoPrompt || presetState.storyIdea}
-      />
-
-      <MusicStudioModal
-        isOpen={isMusicStudioOpen}
-        onClose={() => setIsMusicStudioOpen(false)}
-        defaultPrompt={activeMusicPrompt}
-      />
-
-      <LiveVoiceDirectorModal
-        isOpen={isLiveVoiceOpen}
-        onClose={() => setIsLiveVoiceOpen(false)}
-      />
     </div>
   );
 }
