@@ -11,7 +11,13 @@ React SPA and the `/api/gemini/*` API endpoints. Package manager is **bun**
 docker compose -f docker-compose.base44.yml up -d --build
 ```
 The compose service installs bun globally, runs `bun install --frozen-lockfile`,
-then `npx tsx server.ts`.
+then `./node_modules/.bin/tsx server.ts`.
+
+## Production
+`bun run build` produces `dist/` and an ESM `server.js` beside `server.ts`.
+Keep `server.js` in the repo root so its `import.meta.url`-based static path
+continues to resolve `dist/`. `npm start` sets production mode and runs the
+compiled server. See `DEPLOYMENT.md` for hosting commands and required settings.
 
 ## Key Fix: Vite Host Blocking
 Vite 8 in middleware mode blocks requests from non-localhost hosts with a 403.
