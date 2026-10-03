@@ -1,3 +1,4 @@
+import { useWorkspaceStorage } from '../utils/workspaceStorage';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { PresetState } from '../types';
 import {
@@ -16,6 +17,7 @@ export function TemplatesWorkspace({ state, onApply, onApplyMany }: {
   onApply: (template: StoryTemplate, mode: 'fresh' | 'merge') => boolean;
   onApplyMany?: (templates: StoryTemplate[], mode: 'fresh' | 'merge') => boolean;
 }) {
+  const storage = useWorkspaceStorage();
   const [title, setTitle] = useState('');
   const [kind, setKind] = useState<TemplateKind>('structure');
   const [templates, setTemplates] = useState<StoryTemplate[]>([]);
@@ -33,26 +35,26 @@ export function TemplatesWorkspace({ state, onApply, onApplyMany }: {
   useEffect(() => { if (pending) dialog.current?.showModal(); else dialog.current?.close(); }, [pending]);
   useEffect(() => {
     const refresh = () => {
-      try { setTemplates(readStoryTemplateLibrary(localStorage.getItem(STORY_TEMPLATE_STORAGE_KEY))); }
+      try { setTemplates(readStoryTemplateLibrary(storage.getItem(STORY_TEMPLATE_STORAGE_KEY))); }
       catch (err) { setError(errorText(err, 'Saved templates could not be read.') + ' Existing files and drafts have not been changed.'); }
     };
     refresh();
-    const onStorage = (event: StorageEvent) => { if (event.key === STORY_TEMPLATE_STORAGE_KEY || event.key === null) refresh(); };
+    const onStorage = (event: StorageEvent) => { if (event.key === storage.keyFor(STORY_TEMPLATE_STORAGE_KEY) || event.key === null) refresh(); };
     window.addEventListener('storage', onStorage);
     return () => { importRun.current++; window.removeEventListener('storage', onStorage); };
-  }, []);
+  }, [storage]);
   const save = (event: React.FormEvent) => {
     event.preventDefault();
     setError('');
     setMessage('');
     try {
       const template = createStoryTemplate(title, kind, state);
-      const candidate = previewStoryTemplateImport([{ name: 'Current draft', text: JSON.stringify(template) }], localStorage.getItem(STORY_TEMPLATE_STORAGE_KEY));
+      const candidate = previewStoryTemplateImport([{ name: 'Current draft', text: JSON.stringify(template) }], storage.getItem(STORY_TEMPLATE_STORAGE_KEY));
       if (candidate.errors.length) throw Error(candidate.errors.join(' '));
       if (!candidate.additions.length) {
         setMessage(`“${template.title}” is already in your library. An identical copy was not added.`);
       } else {
-        setTemplates(commitStoryTemplateImport(candidate, localStorage));
+        setTemplates(commitStoryTemplateImport(candidate, storage));
         setMessage(`“${template.title}” saved in this browser. Download a JSON copy below for safekeeping.`);
       }
       setSelected(previous => new Set([...previous, storyTemplateId(template)]));
@@ -76,7 +78,7 @@ export function TemplatesWorkspace({ state, onApply, onApplyMany }: {
         catch { return { name: file.name, error: 'This file could not be read. Choose it again.' }; }
       }));
       if (run !== importRun.current) return;
-      setPreview(previewStoryTemplateImport(sources, localStorage.getItem(STORY_TEMPLATE_STORAGE_KEY)));
+      setPreview(previewStoryTemplateImport(sources, storage.getItem(STORY_TEMPLATE_STORAGE_KEY)));
     } catch (err) {
       if (run === importRun.current) setError(errorText(err, 'Could not read these templates. Nothing was imported.'));
     } finally { if (run === importRun.current) setReading(false); }
@@ -85,7 +87,7 @@ export function TemplatesWorkspace({ state, onApply, onApplyMany }: {
     if (!preview) return;
     setError('');
     try {
-      const next = commitStoryTemplateImport(preview, localStorage);
+      const next = commitStoryTemplateImport(preview, storage);
       setTemplates(next);
       setSelected(previous => new Set([...previous, ...preview.additions.map(storyTemplateId)]));
       setMessage(`${preview.additions.length} template${preview.additions.length === 1 ? '' : 's'} imported. ${preview.duplicates ? `${preview.duplicates} duplicate${preview.duplicates === 1 ? '' : 's'} skipped. ` : ''}The new templates are selected below. Load selected to start a project or merge them into your draft.`);

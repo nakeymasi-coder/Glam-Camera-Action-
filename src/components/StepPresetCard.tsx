@@ -1,3 +1,4 @@
+import { useWorkspaceStorage } from '../utils/workspaceStorage';
 import React, { useState } from 'react';
 import { Check } from 'lucide-react';
 
@@ -26,11 +27,12 @@ export const StepPresetCard: React.FC<StepPresetCardProps> = ({
   onCustomChange,
   helperText,
 }) => {
+  const storage = useWorkspaceStorage();
   const choiceKey='scene_script_preset_choices_v2_'+stepNumber;
-  const [savedChoices,setSavedChoices]=useState<string[]>(()=>{try{const value=JSON.parse(localStorage.getItem(choiceKey)||'[]');return Array.isArray(value)?value.filter(item=>typeof item==='string'&&item.trim()):[]}catch{return []}});
+  const [savedChoices,setSavedChoices]=useState<string[]>(()=>{try{const value=JSON.parse(storage.getItem(choiceKey)||'[]');return Array.isArray(value)?value.filter(item=>typeof item==='string'&&item.trim()):[]}catch{return []}});
   const [choiceMessage,setChoiceMessage]=useState('');
   const [removedChoice,setRemovedChoice]=useState<string|null>(null);
-  const persistChoices=(next:string[])=>{try{localStorage.setItem(choiceKey,JSON.stringify(next));setSavedChoices(next);return true}catch{setChoiceMessage('This browser could not save your choice. Your current text is unchanged.');return false}};
+  const persistChoices=(next:string[])=>{try{storage.setItem(choiceKey,JSON.stringify(next));setSavedChoices(next);return true}catch{setChoiceMessage('This browser could not save your choice. Your current text is unchanged.');return false}};
   const visibleOptions=['None',...Array.from(new Set([...options,...savedChoices,...selectedOptions])).filter(value=>value!=='None'&&value!=='Custom'),'Custom'];
   const addChoice=()=>{const value=customValue.trim();if(!value)return;const duplicate=visibleOptions.find(option=>option.trim().toLocaleLowerCase()===value.toLocaleLowerCase());const chosen=duplicate||value;if(!duplicate&&!persistChoices([...savedChoices,value]))return;onChange(allowMultiSelect?[...selectedOptions.filter(value=>value!=='None'&&value!=='Custom'&&value!==chosen),chosen]:[chosen]);onCustomChange?.('');setChoiceMessage(duplicate?'Selected your existing choice.':'Choice saved in this browser.');};
   const isCustomSelected = selectedOptions.includes('Custom');

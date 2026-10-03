@@ -1,3 +1,4 @@
+import { useWorkspaceStorage } from '../utils/workspaceStorage';
 import React, { useState } from 'react';
 import type { PresetState } from '../types';
 import { BRIEF_CHOICES } from '../studio-core/brief-fields';
@@ -20,25 +21,26 @@ const FIELDS = [
   ['onScreenText','Exact on-screen text','exactTextCaptions'],
 ] as const;
 type SavedChoices = Record<string,string[]>;
-const readSaved=():SavedChoices=>{try{const value:unknown=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}');if(!value||typeof value!=='object'||Array.isArray(value))return {};return Object.fromEntries(Object.entries(value).filter(([category,items])=>Object.hasOwn(BRIEF_CHOICES,category)&&Array.isArray(items)).map(([category,items])=>[category,(items as unknown[]).filter((item):item is string=>typeof item==='string'&&!!item.trim())]));}catch{return {}}};
+const readSaved=(storage: Pick<Storage, 'getItem'>):SavedChoices=>{try{const value:unknown=JSON.parse(storage.getItem(STORAGE_KEY)||'{}');if(!value||typeof value!=='object'||Array.isArray(value))return {};return Object.fromEntries(Object.entries(value).filter(([category,items])=>Object.hasOwn(BRIEF_CHOICES,category)&&Array.isArray(items)).map(([category,items])=>[category,(items as unknown[]).filter((item):item is string=>typeof item==='string'&&!!item.trim())]));}catch{return {}}};
 const key=(text:string)=>text.trim().replace(/\s+/g,' ').toLocaleLowerCase();
 const box='w-full rounded-lg border border-neutral-300 bg-white p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C99C62]';
 
 export function CreativeBriefFields({state,onChange}:{state:PresetState;onChange:(state:PresetState)=>void}) {
-  const [saved,setSaved]=useState<SavedChoices>(readSaved);
+  const storage = useWorkspaceStorage();
+  const [saved,setSaved]=useState<SavedChoices>(() => readSaved(storage));
   const [notice,setNotice]=useState('');
   const [pending,setPending]=useState<{field:string;value:string;label:string}|null>(null);
   const [undo,setUndo]=useState<SavedChoices|null>(null);
   const details=state.optionalDetails as unknown as Record<string,string>;
   const valueFor=(field:string)=>field==='storyIdea'?state.storyIdea:(details[field]||'');
   const setField=(field:string,value:string)=>onChange(field==='storyIdea'?{...state,storyIdea:value}:{...state,optionalDetails:{...state.optionalDetails,[field]:value}});
-  const persist=(next:SavedChoices)=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify(next));setSaved(next);return true}catch{setNotice('Your browser could not save this choice. Your current text is still here.');return false}};
+  const persist=(next:SavedChoices)=>{try{storage.setItem(STORAGE_KEY,JSON.stringify(next));setSaved(next);return true}catch{setNotice('Your browser could not save this choice. Your current text is still here.');return false}};
   const save=(category:string,field:string)=>{const value=valueFor(field).trim();if(!value)return;if((saved[category]||[]).some(x=>key(x)===key(value))){setNotice('That choice is already saved.');return;}if(persist({...saved,[category]:[...(saved[category]||[]),value]}))setNotice('Choice saved in this browser.');};
   const choose=(field:string,value:string,label:string)=>{if(!value)return;if(valueFor(field).trim()&&key(valueFor(field))!==key(value)){setPending({field,value,label});return;}setField(field,value);};
   return <section id="creative-brief" className="scroll-mt-24 gca-brief bg-white rounded-xl border border-neutral-200 shadow-sm p-4 sm:p-6">
     <details>
       <summary className="cursor-pointer font-bold text-base">Story details & reusable choices <span className="font-normal text-xs text-neutral-500">Optional director controls</span></summary>
-      <p className="text-xs text-neutral-600 my-3">Your written direction takes priority. Saved choices stay in this browser; your existing local library and optional Google cloud sync are unchanged.</p>
+      <p className="text-xs text-neutral-600 my-3">Your written direction takes priority. Saved choices stay in this browser workspace, separate for each account and for guests.</p>
       <div className="grid gap-5 md:grid-cols-2">
       {FIELDS.map(([category,label,field])=>{
         const suggestions=BRIEF_CHOICES[category]||[];

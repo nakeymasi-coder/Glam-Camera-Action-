@@ -27,7 +27,13 @@ With approved authentication, link the intended existing app using `npx base44 l
 
 The CLI reports the actual application URL only after successful publication. A successful GitHub push, Base Code preview or Create PR is not proof of publication. Verify the returned HTTPS URL, asset loading, browser interactions and disabled Drive status before sharing it as working.
 
-Storage keys stay unchanged, but browser storage is scoped to the browser/profile/origin. A different preview or published hostname does not automatically copy prior drafts and libraries. Use the existing JSON export/import workflow when moving between origins; no automatic data migration is included.
+## Account-separated browser workspaces
+
+The app waits for Firebase identity resolution before showing stored work. Guest work and each Firebase UID have separate browser workspaces under `scene_script_workspace_v2:`. Switching accounts or signing out remounts the workspace, including the draft, generated output/manual edits, local library, templates, project backups and saved choices. Guest work returns on sign-out; each account's work returns when that account signs in again. Local saved prompts and cached cloud copies are separate. The story auth observer fetches once per actual UID transition; generation checks discard late reads after logout, another account, an A → B → A cycle or unmount. Unrelated renders and repeated notifications for the same UID do not fetch again.
+
+Older unscoped storage keys are left byte-for-byte intact. Since their ownership cannot be established, nothing is automatically shown or assigned to the first signed-in account. A visible “Your older browser work is preserved” notice offers a raw JSON export and an explicitly confirmed recovery workspace. Recovery reads the originals as a fallback and writes only separate recovery copies; reset uses a recovery-only tombstone. The export retains each original raw string, including malformed data, for manual recovery. Cloud Save and Drive backup are unavailable inside recovery, and account changes close it. Returning to the normal workspace does not import recovery content.
+
+This separation prevents accidental mixing in the app; it is not encryption or a security boundary against someone controlling the same browser profile. All storage remains specific to the browser/profile/origin. A different preview or published hostname does not automatically copy drafts or libraries. Template JSON export/import remains available for moving templates between origins; the raw older-data export is a preservation/recovery archive, not an automatic account import.
 
 ## Source preservation
 

@@ -1,12 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   auth,
   signInWithGoogle,
   signOutUser,
-  onAuthStateChanged,
   User,
   saveStoryToCloud,
-  fetchStoriesFromCloud,
 } from '../lib/firebase';
 import {
   LogIn,
@@ -19,62 +17,49 @@ import {
 } from 'lucide-react';
 
 interface AuthBarProps {
-  onSyncCloudStories?: (stories: any[]) => void;
+  user: User | null;
+  recovery?: boolean;
+  isSessionCurrent: () => boolean;
   currentStory?: any;
   onToast: (msg: string) => void;
 }
 
 export const AuthBar: React.FC<AuthBarProps> = ({
-  onSyncCloudStories,
+  user,
+  recovery = false,
+  isSessionCurrent,
   currentStory,
   onToast,
 }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      setIsAuthLoading(false);
-      if (currentUser && onSyncCloudStories) {
-        try {
-          const cloudItems = await fetchStoriesFromCloud(currentUser.uid);
-          if (cloudItems.length > 0) {
-            onSyncCloudStories(cloudItems);
-          }
-        } catch (e) {
-          console.error('Error fetching initial cloud stories:', e);
-        }
-      }
-    });
-
-    return () => unsubscribe();
-  }, [onSyncCloudStories]);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   const handleSignIn = async () => {
     try {
       setIsAuthLoading(true);
       const loggedUser = await signInWithGoogle();
-      onToast(`Signed in as ${loggedUser.displayName || loggedUser.email}!`);
+      if (mounted.current) onToast(`Signed in as ${loggedUser.displayName || loggedUser.email}!`);
     } catch (err: any) {
       console.error(err);
-      onToast(`Sign in error: ${err.message || 'Popup closed'}`);
+      if (mounted.current) onToast(`Sign in error: ${err.message || 'Popup closed'}`);
     } finally {
-      setIsAuthLoading(false);
+      if (mounted.current) setIsAuthLoading(false);
     }
   };
 
   const handleSignOut = async () => {
     try {
       await signOutUser();
-      onToast('Signed out of Google account.');
+      if (mounted.current) onToast('Signed out of Google account.');
     } catch (err: any) {
       console.error(err);
     }
   };
 
   const handleSaveToFirestore = async () => {
+    if (recovery || !isSessionCurrent()) return;
     if (!user) {
       handleSignIn();
       return;
@@ -84,17 +69,21 @@ export const AuthBar: React.FC<AuthBarProps> = ({
       return;
     }
 
+    // Do not let a stale UI event write an old workspace into a newly selected account.
+    if (auth.currentUser?.uid !== user.uid) return;
     setIsSyncing(true);
     try {
       await saveStoryToCloud(user.uid, currentStory);
-      onToast('Saved to Firebase Firestore cloud database!');
+      if (mounted.current && isSessionCurrent() && auth.currentUser?.uid === user.uid) onToast('Saved to Firebase Firestore cloud database!');
     } catch (err: any) {
       console.error(err);
-      onToast(`Firestore save error: ${err.message || 'Permission denied'}`);
+      if (mounted.current && isSessionCurrent() && auth.currentUser?.uid === user.uid) onToast(`Firestore save error: ${err.message || 'Permission denied'}`);
     } finally {
-      setIsSyncing(false);
+      if (mounted.current) setIsSyncing(false);
     }
   };
+
+  if (recovery) return <span className="text-xs text-neutral-600">Recovery · cloud saving off</span>;
 
   if (isAuthLoading) {
     return (

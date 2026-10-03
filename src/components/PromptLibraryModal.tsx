@@ -89,7 +89,7 @@ export const PromptLibraryModal: React.FC<PromptLibraryModalProps> = ({
           <div className="flex items-center gap-2">
             <HardDrive className="w-4 h-4 text-neutral-500 shrink-0" />
             <span>
-              <strong>Storage Location:</strong> Stored locally in your browser&apos;s <code className="font-mono bg-neutral-200 px-1 py-0.5 rounded text-[11px]">LocalStorage</code>. 100% private to this device.
+              <strong>Storage Location:</strong> Local saves and cloud copies are kept separately for this workspace in browser storage. This is not encryption: anyone using this browser profile may access it. Removing a cloud copy here does not delete it from Firestore.
             </span>
           </div>
           {items.length > 0 && (

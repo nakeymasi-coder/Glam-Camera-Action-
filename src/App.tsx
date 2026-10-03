@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   CharacterType,
   StoryGenre,
@@ -38,6 +38,10 @@ import { DriveBackupPanel } from './components/DriveBackupPanel';
 import { enqueueDriveBackup } from './utils/driveBackup';
 import { createLocalId } from './utils/projectIds';
 import { LocalPlanningDesk } from './components/LocalPlanningDesk';
+import { useCloudSession } from './hooks/useCloudSession';
+import { auth, type User } from './lib/firebase';
+import { WorkspaceStorageContext, createWorkspaceStorage, useWorkspaceStorage, readLegacyBrowserData, downloadLegacyBrowserData, type WorkspaceStorage } from './utils/workspaceStorage';
+import { CLOUD_LIBRARY_STORAGE_KEY, readLibrary, mergeCloudStories } from './utils/cloudLibrary';
 
 import { Header } from './components/Header';
 import { StepPresetCard } from './components/StepPresetCard';
@@ -55,22 +59,49 @@ import { ExamplesModal } from './components/ExamplesModal';
 import { Sparkles, ArrowDownRight } from 'lucide-react';
 
 const PRODUCTION_STORAGE_KEY = 'scene_script_production_v2';
-const readProductionCache=()=>{try{return JSON.parse(localStorage.getItem(PRODUCTION_STORAGE_KEY)||'null')}catch{return null}};
+const readProductionCache=(storage: WorkspaceStorage)=>{try{return JSON.parse(storage.getItem(PRODUCTION_STORAGE_KEY)||'null')}catch{return null}};
 const mergeOptions=(core:string[],legacy:string[])=>['None',...Array.from(new Set([...core,...legacy])).filter(value=>value!=='None'&&value!=='Custom'),'Custom'];
 const DRAFT_STORAGE_KEY = 'scene_script_draft_state_v1';
 const LIBRARY_STORAGE_KEY = 'scene_script_library_v1';
 const PROJECT_ID_KEY = 'scene_script_project_id_v1';
 const newProjectId = createLocalId;
 const safeProjectId = (value: unknown) => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(value) && !['__proto__', 'constructor', 'prototype'].includes(value) ? value : newProjectId();
-const readProjectId = () => { try { const value = localStorage.getItem(PROJECT_ID_KEY); return safeProjectId(value); } catch { return newProjectId(); } };
+const readProjectId = (storage: WorkspaceStorage) => { try { const value = storage.getItem(PROJECT_ID_KEY); return safeProjectId(value); } catch { return newProjectId(); } };
 
 export default function App() {
-  const [projectId, setProjectId] = useState(readProjectId);
-  useEffect(() => { try { localStorage.setItem(PROJECT_ID_KEY, projectId); } catch { /* The saved library still carries this project's identity. */ } }, [projectId]);
+  const session = useCloudSession();
+  const [recoveryGeneration, setRecoveryGeneration] = useState<number | null>(null);
+  const recovery = session.ready && recoveryGeneration === session.generation;
+  const uid = session.user?.uid ?? null;
+  const storage = useMemo(() => createWorkspaceStorage(uid, recovery), [uid, recovery]);
+  // Never render another workspace while Firebase is determining the current identity.
+  if (!session.ready) return <main className="gca-app min-h-screen p-8" role="status">Opening your workspace…</main>;
+  const openRecovery = () => {
+    if (window.confirm('Older browser data may include work from another person or Google account. Only open it if you are allowed to access it. It stays in a separate recovery workspace and will not be uploaded or assigned to your account. Continue?')) setRecoveryGeneration(session.generation);
+  };
+  return <WorkspaceStorageContext.Provider value={storage}>
+    <AppWorkspace key={storage.keyFor('workspace')} user={session.user} cloudStories={recovery ? null : session.cloudStories} recovery={recovery} isSessionCurrent={session.isCurrent} onOpenRecovery={openRecovery} onExitRecovery={() => setRecoveryGeneration(null)} />
+  </WorkspaceStorageContext.Provider>;
+}
+
+export function AppWorkspace({ user, cloudStories, recovery, isSessionCurrent, onOpenRecovery, onExitRecovery }: {
+  user: User | null;
+  cloudStories: SavedPromptItem[] | null;
+  recovery: boolean;
+  isSessionCurrent: () => boolean;
+  onOpenRecovery: () => void;
+  onExitRecovery: () => void;
+}) {
+  const storage = useWorkspaceStorage();
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const [hasLegacyData] = useState(() => { try { return Object.keys(readLegacyBrowserData().records).length > 0; } catch { return false; } });
+  const [projectId, setProjectId] = useState(() => readProjectId(storage));
+  useEffect(() => { try { storage.setItem(PROJECT_ID_KEY, projectId); } catch { /* The saved library still carries this project's identity. */ } }, [projectId]);
   // Load draft from localStorage if present
   const [presetState, setPresetState] = useState<PresetState>(() => {
     try {
-      const savedDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
+      const savedDraft = storage.getItem(DRAFT_STORAGE_KEY);
       if (savedDraft) {
         return normalizeStudioState(JSON.parse(savedDraft));
       }
@@ -81,11 +112,11 @@ export default function App() {
   });
 
   // Saved prompt library
-  const [savedLibrary, setSavedLibrary] = useState<SavedPromptItem[]>(() => {
+  const [localLibrary, setLocalLibrary] = useState<SavedPromptItem[]>(() => {
     try {
-      const saved = localStorage.getItem(LIBRARY_STORAGE_KEY);
+      const saved = storage.getItem(LIBRARY_STORAGE_KEY);
       if (saved) {
-        return JSON.parse(saved);
+        return readLibrary(saved);
       }
     } catch (err) {
       console.error('Error loading library:', err);
@@ -94,13 +125,13 @@ export default function App() {
   });
 
   // Master Prompt state (editable by user)
-  const [generatedPrompt, setGeneratedPrompt] = useState<string>(()=>readProductionCache()?.prompt||'');
-  const [productionState,setProductionState]=useState<PresetState>(()=>normalizeStudioState(readProductionCache()?.state||presetState));
-  const [manualOverride,setManualOverride]=useState<string>(()=>readProductionCache()?.overrideText||'');
+  const [generatedPrompt, setGeneratedPrompt] = useState<string>(()=>readProductionCache(storage)?.prompt||'');
+  const [productionState,setProductionState]=useState<PresetState>(()=>normalizeStudioState(readProductionCache(storage)?.state||presetState));
+  const [manualOverride,setManualOverride]=useState<string>(()=>readProductionCache(storage)?.overrideText||'');
   const [starterRotation]=useState(()=>createLocalStarterRotation());
   const [automaticFingerprint,setAutomaticFingerprint]=useState<string|null>(null);
   const [starterSuggestion,setStarterSuggestion]=useState<any>(null);
-  const [hasGeneratedOnce, setHasGeneratedOnce] = useState<boolean>(()=>Boolean(readProductionCache()?.prompt));
+  const [hasGeneratedOnce, setHasGeneratedOnce] = useState<boolean>(()=>Boolean(readProductionCache(storage)?.prompt));
   const [isCopied, setIsCopied] = useState<boolean>(false);
 
   // Active view: 'builder' | 'canvases' | 'bible'
@@ -123,22 +154,33 @@ export default function App() {
   // Save draft state to localStorage on modification
   useEffect(() => {
     try {
-      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(presetState));
+      storage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(presetState));
     } catch (err) {
       console.error('Failed to save draft to localStorage:', err);
+      showToast('This browser could not save your draft. Copy it before switching accounts or leaving.');
     }
   }, [presetState]);
 
-  useEffect(()=>{try{if(hasGeneratedOnce)localStorage.setItem(PRODUCTION_STORAGE_KEY,JSON.stringify({state:productionState,prompt:generatedPrompt,overrideText:manualOverride}));else localStorage.removeItem(PRODUCTION_STORAGE_KEY);}catch{showToast('This browser could not save the current output. Copy or export it before leaving.');}},[productionState,generatedPrompt,manualOverride,hasGeneratedOnce,showToast]);
+  useEffect(()=>{try{if(hasGeneratedOnce)storage.setItem(PRODUCTION_STORAGE_KEY,JSON.stringify({state:productionState,prompt:generatedPrompt,overrideText:manualOverride}));else storage.removeItem(PRODUCTION_STORAGE_KEY);}catch{showToast('This browser could not save the current output. Copy or export it before leaving.');}},[productionState,generatedPrompt,manualOverride,hasGeneratedOnce,showToast]);
 
-  // Save library to localStorage on modification
+  // Cloud cache and local saves are separate, and both belong only to this workspace.
+  const [cloudLibrary, setCloudLibrary] = useState<SavedPromptItem[]>(() => {
+    if (!user || recovery) return [];
+    try { return readLibrary(storage.getItem(CLOUD_LIBRARY_STORAGE_KEY)); } catch { return []; }
+  });
+  const savedLibrary = useMemo(() => mergeCloudStories(localLibrary, cloudLibrary), [localLibrary, cloudLibrary]);
   useEffect(() => {
+    if (!cloudStories || !user || recovery) return;
     try {
-      localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(savedLibrary));
-    } catch (err) {
-      console.error('Failed to save library to localStorage:', err);
-    }
-  }, [savedLibrary]);
+      const checked = readLibrary(JSON.stringify(cloudStories.filter(item => !(item as any).userId || (item as any).userId === user.uid)));
+      setCloudLibrary(previous => mergeCloudStories(previous, checked));
+    } catch { showToast('Some cloud stories could not be read. Your saved browser work is unchanged.'); }
+  }, [cloudStories, user, recovery, showToast]);
+  useEffect(() => {
+    if (!user || recovery || !cloudLibrary.length) return;
+    try { storage.setItem(CLOUD_LIBRARY_STORAGE_KEY, JSON.stringify(cloudLibrary)); }
+    catch { showToast('Cloud stories loaded, but this browser could not cache them.'); }
+  }, [cloudLibrary, storage, user, recovery, showToast]);
 
   // Keyboard shortcut: Cmd/Ctrl + Enter to generate
   useEffect(() => {
@@ -199,11 +241,11 @@ export default function App() {
   const appendStarter=()=>{if(!starterSuggestion)return;const next=normalizeStudioState({...presetState,storyIdea:[presetState.storyIdea,'Adapt this alternative idea to the established cast, setting, and era without replacing their explicit details: '+starterSuggestion.pick.starter.idea].filter(Boolean).join('\n\n')});setPresetState(next);setAutomaticFingerprint(null);if(starterSuggestion.generate)applyProduction(next);setStarterSuggestion(null);};
 
   const [projectBackups, setProjectBackups] = useState<ProjectBackup[]>(() => {
-    try { return readProjectBackups(); } catch { return []; }
+    try { return readProjectBackups(storage); } catch { return []; }
   });
   const backupCurrentProject = () => {
     try {
-      setProjectBackups(saveProjectBackup({ projectId, draft: presetState, production: productionState, prompt: generatedPrompt, overrideText: manualOverride, hasGeneratedOnce }));
+      setProjectBackups(saveProjectBackup({ projectId, draft: presetState, production: productionState, prompt: generatedPrompt, overrideText: manualOverride, hasGeneratedOnce }, storage));
       return true;
     } catch {
       showToast('Could not back up your project. Nothing was changed. Free browser storage or export your work before trying again.');
@@ -273,7 +315,7 @@ export default function App() {
     setHasGeneratedOnce(false);
     setIsResetConfirmOpen(false);
     try {
-      localStorage.removeItem(DRAFT_STORAGE_KEY);
+      storage.removeItem(DRAFT_STORAGE_KEY);
     } catch (e) {
       console.error(e);
     }
@@ -294,16 +336,19 @@ export default function App() {
     };
 
     try {
-      const nextLibrary = [newItem, ...savedLibrary];
-      localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(nextLibrary));
-      setSavedLibrary(nextLibrary);
+      const nextLibrary = [newItem, ...localLibrary];
+      storage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(nextLibrary));
+      setLocalLibrary(nextLibrary);
     } catch {
       showToast('This browser could not save your prompt. Free storage or copy your output, then try again.');
       return false;
     }
     showToast(`Saved "${title}" to your Prompt Library!`);
     // Drive failure must never roll back or interrupt a successful local save.
-    void Promise.resolve().then(() => enqueueDriveBackup({ projectId, title, savedAt: newItem.createdAt, state: newItem.state })).catch(() => { /* The backup panel reports errors and reconnect requirements. */ });
+    if (!recovery && user) void Promise.resolve().then(() => {
+      if (!mounted.current || !isSessionCurrent() || (auth.currentUser?.uid ?? null) !== (user?.uid ?? null)) return;
+      return enqueueDriveBackup({ projectId, title, savedAt: newItem.createdAt, state: newItem.state });
+    }).catch(() => { /* The backup panel reports errors and reconnect requirements. */ });
     return true;
   };
 
@@ -316,18 +361,21 @@ export default function App() {
     showToast(`Loaded prompt "${item.title}".`);
   };
 
-  // Delete item from library
-  const handleDeleteFromLibrary = (id: string) => {
-    setSavedLibrary((prev) => prev.filter((i) => i.id !== id));
-    showToast('Prompt removed from library.');
+  // Removing a cached cloud copy does not delete the remote Firestore story.
+  const updateLibraries = (local: SavedPromptItem[], cloud: SavedPromptItem[]) => {
+    try {
+      storage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(local));
+      storage.setItem(CLOUD_LIBRARY_STORAGE_KEY, JSON.stringify(cloud));
+      setLocalLibrary(local);
+      setCloudLibrary(cloud);
+      return true;
+    } catch { showToast('This browser could not update the library. Try again after freeing storage.'); return false; }
   };
-
-  // Clear library
+  const handleDeleteFromLibrary = (id: string) => {
+    if (updateLibraries(localLibrary.filter(item => item.id !== id), cloudLibrary.filter(item => item.id !== id))) showToast('Prompt removed from this browser library.');
+  };
   const handleClearLibrary = () => {
-    if (window.confirm('Are you sure you want to delete all saved prompts in your library?')) {
-      setSavedLibrary([]);
-      showToast('Library cleared.');
-    }
+    if (window.confirm('Delete all saved prompts and cloud copies from this workspace’s browser library? Cloud originals stay in Firestore.') && updateLibraries([], [])) showToast('Workspace library cleared.');
   };
 
   // Curated example
@@ -336,17 +384,6 @@ export default function App() {
     const example=normalizeStudioState(ex.state);setPresetState(example);setAutomaticFingerprint(null);applyProduction(example);
     setActiveView('builder');
     showToast(`Loaded "${ex.name}" reference setup!`);
-  };
-
-  // Cloud sync handler from Firebase
-  const handleSyncCloudStories = (cloudStories: any[]) => {
-    if (!cloudStories || cloudStories.length === 0) return;
-    setSavedLibrary((prev) => {
-      const existingIds = new Set(prev.map((p) => p.id));
-      const newItems = cloudStories.filter((c) => !existingIds.has(c.id));
-      return [...newItems, ...prev];
-    });
-    showToast(`Synced ${cloudStories.length} cloud stories from Firebase Firestore!`);
   };
 
   const activeCharType = presetState.characterTypes.find((t) => t !== 'None') || '';
@@ -388,7 +425,9 @@ export default function App() {
         setActiveView={setActiveView}
         currentStory={currentStoryObject}
         onToast={showToast}
-        onSyncCloudStories={handleSyncCloudStories}
+        user={user}
+        recovery={recovery}
+        isSessionCurrent={isSessionCurrent}
       />
 
       <section className={'gca-hero ' + (activeView !== 'builder' ? 'gca-hero-compact' : '')} aria-label="Glam, Camera, Action! studio">
@@ -404,6 +443,13 @@ export default function App() {
 
       <div className="gca-notices max-w-6xl mx-auto w-full px-4 sm:px-6 pt-3 text-xs text-neutral-600">
         <p>Prompt and story planning run locally in your browser. No AI API, credits or key required.</p>
+        <p className="mt-2">{recovery ? 'Recovery workspace: older browser work stays separate. Cloud saving and Drive backup are disabled here.' : user ? 'Account workspace: drafts, output, libraries and backups are separate for this Google account. Guest work is preserved and returns when you sign out.' : 'Guest workspace: local work stays here when you sign in and returns when you sign out.'} Browser storage is not encrypted; someone using this browser profile can access it.</p>
+        {recovery && <button className="mt-2 underline font-semibold" onClick={onExitRecovery}>Return to my workspace</button>}
+        {hasLegacyData && <section aria-label="Older browser data" className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-950">
+          <p className="font-semibold">Your older browser work is preserved.</p>
+          <p>Earlier versions mixed local and cloud work without recording ownership. We kept the original drafts, output, libraries, templates, saved choices and backups untouched and separate, so they are not automatically shown in any account. They may belong to another person or account.</p>
+          <div className="flex flex-wrap gap-4 mt-2">{!recovery && <button className="underline font-semibold" onClick={onOpenRecovery}>Open recovery workspace</button>}<button className="underline font-semibold" onClick={() => { if (!window.confirm('This download can include work from other people or accounts that used this browser profile. Only export it if you are allowed to access it. Download the original older browser data?')) return; try { downloadLegacyBrowserData(); showToast('Older browser data exported as a recovery JSON file. The originals are unchanged.'); } catch { showToast('The recovery export failed. The original browser data is unchanged.'); } }}>Export older browser data</button></div>
+        </section>}
         {hasGeneratedOnce&&<p className="mt-2">{production.notice}</p>}
         {briefChanged&&<p role="status" className="mt-2 rounded-lg bg-amber-50 border border-amber-200 p-3 text-amber-950">Your brief has changed. Generate again to update the master prompt, shot direction and six canvases together. Saving keeps the settings used for the current output.</p>}
         {manualOverride&&<p className="mt-2 rounded-lg bg-amber-50 border border-amber-200 p-3 text-neutral-800">Manual prompt edits are carried verbatim into every scene as priority direction. The app does not automatically interpret arbitrary prose into the structured fields. Rebuild from fields to replace this override.</p>}
@@ -504,7 +550,7 @@ export default function App() {
         <div hidden={activeView !== 'templates'}>
           <TemplatesWorkspace state={presetState} onApply={handleApplyTemplate} onApplyMany={handleApplyTemplates} />
           <ProjectBackups projects={projectBackups} onRestore={handleRestoreProject} />
-          <DriveBackupPanel />
+          {!recovery && <DriveBackupPanel />}
         </div>
 
         {activeView === 'canvases' && (
