@@ -30,6 +30,8 @@ import { CreativeBriefFields } from './components/CreativeBriefFields';
 import { BuilderGuidance } from './components/BuilderGuidance';
 import { ProductionDetails } from './components/ProductionDetails';
 import { CharacterPlanner } from './components/CharacterPlanner';
+import { TemplatesWorkspace } from './components/TemplatesWorkspace';
+import { applyStoryTemplate, type StoryTemplate } from './utils/storyTemplates';
 import { LocalPlanningDesk } from './components/LocalPlanningDesk';
 
 import { Header } from './components/Header';
@@ -91,7 +93,7 @@ export default function App() {
   const [isCopied, setIsCopied] = useState<boolean>(false);
 
   // Active view: 'builder' | 'canvases' | 'bible'
-  const [activeView, setActiveView] = useState<'builder' | 'canvases' | 'bible' | 'characters'>('builder');
+  const [activeView, setActiveView] = useState<'builder' | 'canvases' | 'bible' | 'characters' | 'templates'>('builder');
 
   // Modals state
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
@@ -184,6 +186,21 @@ export default function App() {
   const handleRandom=()=>suggestStarter(false);
   const handleSurpriseMe=()=>suggestStarter(true);
   const appendStarter=()=>{if(!starterSuggestion)return;const next=normalizeStudioState({...presetState,storyIdea:[presetState.storyIdea,'Adapt this alternative idea to the established cast, setting, and era without replacing their explicit details: '+starterSuggestion.pick.starter.idea].filter(Boolean).join('\n\n')});setPresetState(next);setAutomaticFingerprint(null);if(starterSuggestion.generate)applyProduction(next);setStarterSuggestion(null);};
+
+  const handleApplyTemplate = (template: StoryTemplate, mode: 'fresh' | 'merge') => {
+    const next = applyStoryTemplate(presetState, template, mode);
+    setPresetState(next);
+    setAutomaticFingerprint(null);
+    setStarterSuggestion(null);
+    if (mode === 'fresh') {
+      setProductionState(next);
+      setGeneratedPrompt('');
+      setManualOverride('');
+      setHasGeneratedOnce(false);
+    }
+    setActiveView(template.kind === 'characters' ? 'characters' : 'builder');
+    showToast(`Template “${template.title}” ${mode === 'fresh' ? 'loaded into a fresh draft' : 'merged into your draft'}. Generate when ready.`);
+  };
 
   // Reset Everything
   const handleConfirmReset = () => {
@@ -302,7 +319,7 @@ export default function App() {
       <section className={'gca-hero ' + (activeView !== 'builder' ? 'gca-hero-compact' : '')} aria-label="Glam, Camera, Action! studio">
         <div className="gca-hero-copy">
           <p className="gca-eyebrow"><span aria-hidden="true"/> GLAM, CAMERA, ACTION!</p>
-          <h1>{activeView === 'builder' ? <>Your idea.<br/>Ready for its <em>close-up.</em></> : activeView === 'canvases' ? <>Six canvases.<br/><em>One connected story.</em></> : activeView === 'bible' ? <>Every detail.<br/><em>In the same world.</em></> : <>Your cast.<br/><em>Every arc connected.</em></>}</h1>
+          <h1>{activeView === 'builder' ? <>Your idea.<br/>Ready for its <em>close-up.</em></> : activeView === 'canvases' ? <>Six canvases.<br/><em>One connected story.</em></> : activeView === 'bible' ? <>Every detail.<br/><em>In the same world.</em></> : activeView === 'characters' ? <>Your cast.<br/><em>Every arc connected.</em></> : <>Your story kit.<br/><em>Ready to reuse.</em></>}</h1>
           <p className="gca-hero-description">Build your brief, shape three connected scenes, and take your story from first spark to production-ready prompts.</p>
           <a className="gca-start-link" href="#studio-workspace">{activeView === 'builder' ? 'Start shaping your story' : 'Go to your workspace'} <ArrowDownRight size={18} className="text-[#C99C62]" aria-hidden="true"/></a>
           <div className="gca-sequence" aria-label="Production structure"><span>01 <b>THE IDEA</b></span><i aria-hidden="true"/><span>03 <b>SCENES</b></span><i aria-hidden="true"/><span>06 <b>CANVASES</b></span></div>
@@ -408,6 +425,10 @@ export default function App() {
         )}
 
         {activeView === 'characters' && <CharacterPlanner state={presetState} onChange={setPresetState} />}
+
+        <div hidden={activeView !== 'templates'}>
+          <TemplatesWorkspace state={presetState} onApply={handleApplyTemplate} />
+        </div>
 
         {activeView === 'canvases' && (
           <SixCanvasInspector canvases={sixCanvases} />

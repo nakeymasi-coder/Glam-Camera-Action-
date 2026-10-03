@@ -6,15 +6,15 @@ interface HeaderProps {
   savedCount: number;
   onOpenLibrary: () => void;
   onOpenExamples: () => void;
-  activeView: 'builder' | 'canvases' | 'bible' | 'characters';
-  setActiveView: (view: 'builder' | 'canvases' | 'bible' | 'characters') => void;
+  activeView: 'builder' | 'canvases' | 'bible' | 'characters' | 'templates';
+  setActiveView: (view: 'builder' | 'canvases' | 'bible' | 'characters' | 'templates') => void;
   currentStory?: any;
   onToast: (msg: string) => void;
   onSyncCloudStories?: (stories: any[]) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ savedCount, onOpenLibrary, onOpenExamples, activeView, setActiveView, currentStory, onToast, onSyncCloudStories }) => {
-  const views = [ ['builder','01','Story builder'], ['canvases','02','6-Canvas Flow'], ['bible','03','Story Bible'], ['characters','04','Characters'] ] as const;
+  const views = [ ['builder','01','Story builder'], ['canvases','02','6-Canvas Flow'], ['bible','03','Story Bible'], ['characters','04','Characters'], ['templates','05','Templates'] ] as const;
   return <header className="gca-header">
     <div className="gca-header-top">
       <button className="gca-wordmark" onClick={() => setActiveView('builder')} aria-label="Glam, Camera, Action! Home">
