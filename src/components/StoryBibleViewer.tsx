@@ -129,14 +129,14 @@ export const StoryBibleViewer: React.FC<StoryBibleViewerProps> = ({ state }) => 
       </div>
 
       {/* Quality Rules Checklist from Page 9 */}
-      <div className="bg-neutral-900 text-white rounded-xl p-5 sm:p-6 shadow-sm">
+      <div className="bg-amber-100 text-neutral-900 rounded-xl p-5 sm:p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-3">
           <ShieldCheck className="w-4 h-4 text-[#C99C62]" />
           <h3 className="text-sm sm:text-base font-bold tracking-tight">
             Production Quality Standards (Page 9 Brief)
           </h3>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-neutral-300">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-neutral-700">
           <div className="flex items-start gap-2">
             <CheckCircle2 className="w-3.5 h-3.5 text-[#C99C62] shrink-0 mt-0.5" />
             <span><strong>Specificity over clutter:</strong> 1 dominant story beat, 1 primary focal subject per scene.</span>

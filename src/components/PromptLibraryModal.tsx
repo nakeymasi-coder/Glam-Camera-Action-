@@ -64,21 +64,21 @@ export const PromptLibraryModal: React.FC<PromptLibraryModalProps> = ({
     <div role="dialog" aria-modal="true" aria-label="Library" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
       <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-neutral-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-neutral-200 flex items-center justify-between bg-neutral-900 text-white">
+        <div className="px-6 py-4 border-b border-neutral-200 flex items-center justify-between bg-amber-100 text-neutral-900">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-[#C99C62] flex items-center justify-center text-neutral-950">
               <Bookmark className="w-4 h-4 fill-current" />
             </div>
             <div>
               <h2 className="text-base font-bold">Saved Prompt Library</h2>
-              <p className="text-xs text-neutral-400">
+              <p className="text-xs text-neutral-600">
                 {items.length} {items.length === 1 ? 'production prompt' : 'production prompts'} saved
               </p>
             </div>
           </div>
           <button
             onClick={onClose} aria-label="Close library"
-            className="p-1 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
+            className="p-1 rounded-lg text-neutral-600 hover:text-neutral-900 hover:bg-amber-200 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>

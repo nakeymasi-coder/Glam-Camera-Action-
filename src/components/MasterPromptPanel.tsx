@@ -36,13 +36,13 @@ export const MasterPromptPanel: React.FC<MasterPromptPanelProps> = ({
   return (
     <div id="generated-prompt-section" data-gca-panel="master" className="bg-white rounded-xl border border-neutral-300 shadow-md overflow-hidden">
       {/* Header bar */}
-      <div className="bg-neutral-900 text-white px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-amber-100 text-neutral-900 px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <div className="w-2.5 h-2.5 rounded-full bg-[#C99C62]" />
           <h2 className="text-sm sm:text-base font-bold tracking-tight">
             Generated ChatGPT Master Prompt
           </h2>
-          <span className="text-[11px] font-mono text-neutral-400 border border-neutral-700 px-2 py-0.5 rounded">
+          <span className="text-[11px] font-mono text-neutral-600 border border-amber-200 px-2 py-0.5 rounded">
             Editable Canvas Engine
           </span>
         </div>
@@ -52,7 +52,7 @@ export const MasterPromptPanel: React.FC<MasterPromptPanelProps> = ({
           <button
             type="button"
             onClick={() => setIsEditing(!isEditing)}
-            className="flex items-center gap-1 text-xs text-neutral-300 hover:text-white px-2.5 py-1.5 rounded hover:bg-neutral-800 transition-colors"
+            className="flex items-center gap-1 text-xs text-neutral-700 hover:text-neutral-900 px-2.5 py-1.5 rounded hover:bg-amber-200 transition-colors"
             title="Toggle between raw editor and preview mode"
           >
             {isEditing ? <Eye className="w-3.5 h-3.5" /> : <Edit3 className="w-3.5 h-3.5" />}
@@ -62,7 +62,7 @@ export const MasterPromptPanel: React.FC<MasterPromptPanelProps> = ({
           <button
             type="button"
             onClick={handleDownload}
-            className="flex items-center gap-1 text-xs text-neutral-300 hover:text-white px-2.5 py-1.5 rounded hover:bg-neutral-800 transition-colors"
+            className="flex items-center gap-1 text-xs text-neutral-700 hover:text-neutral-900 px-2.5 py-1.5 rounded hover:bg-amber-200 transition-colors"
             title="Download as Markdown file"
           >
             <Download className="w-3.5 h-3.5" />
@@ -72,7 +72,7 @@ export const MasterPromptPanel: React.FC<MasterPromptPanelProps> = ({
           <button
             type="button"
             onClick={onRegenerate}
-            className="flex items-center gap-1 text-xs text-neutral-300 hover:text-white px-2.5 py-1.5 rounded hover:bg-neutral-800 transition-colors"
+            className="flex items-center gap-1 text-xs text-neutral-700 hover:text-neutral-900 px-2.5 py-1.5 rounded hover:bg-amber-200 transition-colors"
             title="Rebuild prompt from current selections"
           >
             <RefreshCw className="w-3.5 h-3.5" />
@@ -117,17 +117,17 @@ export const MasterPromptPanel: React.FC<MasterPromptPanelProps> = ({
       </div>
 
       {/* Editor / Preview Area */}
-      <div className="p-4 sm:p-6 bg-neutral-950 text-neutral-100">
+      <div className="p-4 sm:p-6 bg-neutral-50 text-neutral-900">
         {isEditing ? (
           <textarea
             value={prompt}
             onChange={(e) => onPromptChange(e.target.value)}
             rows={18}
-            className="w-full bg-neutral-950 text-neutral-100 font-mono text-xs sm:text-sm leading-relaxed p-3 rounded-lg border border-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#C99C62] focus:border-[#C99C62] resize-y selection:bg-[#C99C62] selection:text-black"
+            className="w-full bg-white text-neutral-900 font-mono text-xs sm:text-sm leading-relaxed p-3 rounded-lg border border-neutral-300 focus:outline-none focus:ring-1 focus:ring-[#C99C62] focus:border-[#C99C62] resize-y selection:bg-[#C99C62] selection:text-black"
             placeholder="Generated master prompt will appear here..."
           />
         ) : (
-          <div className="whitespace-pre-wrap font-mono text-xs sm:text-sm leading-relaxed p-4 rounded-lg bg-neutral-900/80 border border-neutral-800 text-neutral-200 max-h-[500px] overflow-y-auto selection:bg-[#C99C62] selection:text-black">
+          <div className="whitespace-pre-wrap font-mono text-xs sm:text-sm leading-relaxed p-4 rounded-lg bg-white border border-neutral-300 text-neutral-900 max-h-[500px] overflow-y-auto selection:bg-[#C99C62] selection:text-black">
             {prompt}
           </div>
         )}
