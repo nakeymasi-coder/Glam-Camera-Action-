@@ -1,0 +1,13 @@
+export const ERA_CHOICES = ['Prehistoric world','Ancient world','Medieval era','Renaissance era','Victorian era','Old West','1920s','1930s','1940s','1950s','1960s','1970s','1980s','1990s','2000s','2010s','Present day','Near future','Distant future','Timeless fantasy'];
+export function eraDirection(era:string|undefined):string{
+ if(!era?.trim())return '';
+ const text=era.trim();let detail='Anchor wardrobe, architecture, transport, props, everyday technology, and social details to the stated period and location. Avoid accidental modern objects; do not force a stereotype or change character identity.';
+ if(/1970|\b70s\b/i.test(text))detail='Use location-appropriate 1970s clothing silhouettes, analog communication, printed materials, and period vehicles/interiors. Exclude smartphones, modern laptops, and contemporary interfaces. Use tactile surfaces and practical light without forcing a sepia filter.';
+ else if(/1980|\b80s\b/i.test(text))detail='Use location-appropriate 1980s wardrobe, analog or early electronic equipment, period packaging, and architecture. Landlines, tapes, and CRT displays appear only when relevant. Exclude smartphones and contemporary flat-screen interfaces; neon is optional, not automatic.';
+ else if(/1990|\b90s\b/i.test(text))detail='Use location-appropriate 1990s wardrobe, vehicles, printed ephemera, and consumer technology. Use landlines, pagers, tapes/CDs, or early computers only where the setting calls for them. Avoid smartphones, current social-media screens, and modern design cues.';
+ else if(/2000/i.test(text))detail='Use location-appropriate 2000s clothing, interiors, packaging, computers, and mobile phones. Keep technology consistent with the specific part of the decade; avoid importing current app interfaces or styling by default.';
+ else if(/future/i.test(text))detail='Define a coherent level of future technology and carry it through costume, transport, architecture, tools, and communication. Each invented device has a readable purpose; avoid unrelated holograms or dashboard clutter.';
+ else if(/fantasy/i.test(text))detail='Establish one consistent fantasy-world technology level, material palette, costume logic, and built environment. Keep real-world decade cues out unless explicitly requested.';
+ else if(/present|2010/i.test(text))detail='Keep clothing, everyday objects, transport, and communication consistent with the stated contemporary period and location. Use current technology only when it serves the action.';
+ return `TIME PERIOD: ${text}. ${detail} The era sets the story world; the selected visual style still determines its rendering. Adjust acting, blocking, camera support, and sound to the setting without pretending every story from a decade uses the same film grammar.`;
+}

@@ -1,0 +1,8 @@
+{
+  "name": "Glam, Camera, Action!",
+  "description": "Your creative production studio. Build a story brief, three connected scenes, and six coordinated image and script canvases.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
