@@ -33,7 +33,9 @@ import { CharacterPlanner } from './components/CharacterPlanner';
 import { TemplatesWorkspace } from './components/TemplatesWorkspace';
 import { ProjectBackups } from './components/ProjectBackups';
 import { readProjectBackups, saveProjectBackup, type ProjectBackup } from './utils/projectBackups';
-import { applyStoryTemplate, type StoryTemplate } from './utils/storyTemplates';
+import { applyStoryTemplates, type StoryTemplate } from './utils/storyTemplates';
+import { DriveBackupPanel } from './components/DriveBackupPanel';
+import { enqueueDriveBackup } from './utils/driveBackup';
 import { LocalPlanningDesk } from './components/LocalPlanningDesk';
 
 import { Header } from './components/Header';
@@ -56,8 +58,14 @@ const readProductionCache=()=>{try{return JSON.parse(localStorage.getItem(PRODUC
 const mergeOptions=(core:string[],legacy:string[])=>['None',...Array.from(new Set([...core,...legacy])).filter(value=>value!=='None'&&value!=='Custom'),'Custom'];
 const DRAFT_STORAGE_KEY = 'scene_script_draft_state_v1';
 const LIBRARY_STORAGE_KEY = 'scene_script_library_v1';
+const PROJECT_ID_KEY = 'scene_script_project_id_v1';
+const newProjectId = () => crypto.randomUUID();
+const safeProjectId = (value: unknown) => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(value) && !['__proto__', 'constructor', 'prototype'].includes(value) ? value : newProjectId();
+const readProjectId = () => { try { const value = localStorage.getItem(PROJECT_ID_KEY); return safeProjectId(value); } catch { return newProjectId(); } };
 
 export default function App() {
+  const [projectId, setProjectId] = useState(readProjectId);
+  useEffect(() => { try { localStorage.setItem(PROJECT_ID_KEY, projectId); } catch { /* The saved library still carries this project's identity. */ } }, [projectId]);
   // Load draft from localStorage if present
   const [presetState, setPresetState] = useState<PresetState>(() => {
     try {
@@ -194,7 +202,7 @@ export default function App() {
   });
   const backupCurrentProject = () => {
     try {
-      setProjectBackups(saveProjectBackup({ draft: presetState, production: productionState, prompt: generatedPrompt, overrideText: manualOverride, hasGeneratedOnce }));
+      setProjectBackups(saveProjectBackup({ projectId, draft: presetState, production: productionState, prompt: generatedPrompt, overrideText: manualOverride, hasGeneratedOnce }));
       return true;
     } catch {
       showToast('Could not back up your project. Nothing was changed. Free browser storage or export your work before trying again.');
@@ -203,6 +211,7 @@ export default function App() {
   };
   const handleRestoreProject = (project: ProjectBackup) => {
     if (!backupCurrentProject()) return;
+    setProjectId(safeProjectId(project.projectId || project.id));
     setPresetState(normalizeStudioState(project.draft));
     setProductionState(normalizeStudioState(project.production));
     setGeneratedPrompt(project.prompt);
@@ -214,12 +223,13 @@ export default function App() {
     showToast('Project restored, including its output and edits. The project you left is backed up in Templates.');
   };
   const handleApplyTemplate = (template: StoryTemplate, mode: 'fresh' | 'merge') => {
-    const next = applyStoryTemplate(presetState, template, mode);
+    const next = applyStoryTemplates(presetState, [template], mode);
     if (mode === 'fresh' && !backupCurrentProject()) return false;
     setPresetState(next);
     setAutomaticFingerprint(null);
     setStarterSuggestion(null);
     if (mode === 'fresh') {
+      setProjectId(newProjectId());
       setProductionState(next);
       setGeneratedPrompt('');
       setManualOverride('');
@@ -230,8 +240,32 @@ export default function App() {
     return true;
   };
 
+  const handleApplyTemplates = (templates: StoryTemplate[], mode: 'fresh' | 'merge') => {
+    try {
+      const next = applyStoryTemplates(presetState, templates, mode);
+      if (mode === 'fresh' && !backupCurrentProject()) return false;
+      setPresetState(next);
+      setAutomaticFingerprint(null);
+      setStarterSuggestion(null);
+      if (mode === 'fresh') {
+        setProjectId(newProjectId());
+        setProductionState(next);
+        setGeneratedPrompt('');
+        setManualOverride('');
+        setHasGeneratedOnce(false);
+      }
+      setActiveView(templates.every(template => template.kind === 'characters') ? 'characters' : 'builder');
+      showToast(`${templates.length} templates loaded together. ${mode === 'fresh' ? 'Your previous project is backed up in Templates. ' : ''}Generate when ready.`);
+      return true;
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Templates could not be loaded. Your draft was not changed.');
+      return false;
+    }
+  };
+
   // Reset Everything
   const handleConfirmReset = () => {
+    setProjectId(newProjectId());
     setPresetState(normalizeStudioState(INITIAL_PRESET_STATE));
     setProductionState(normalizeStudioState(INITIAL_PRESET_STATE));setManualOverride('');setAutomaticFingerprint(null);setStarterSuggestion(null);
     setGeneratedPrompt('');
@@ -249,7 +283,8 @@ export default function App() {
   const handleSavePrompt = (title: string) => {
     const currentPrompt = generatedPrompt || buildMasterPrompt(presetState);
     const newItem: SavedPromptItem = {
-      id: `prompt-${Date.now()}`,
+      id: crypto.randomUUID(),
+      projectId,
       title,
       createdAt: new Date().toISOString(),
       state: normalizeStudioState(hasGeneratedOnce?productionState:presetState),
@@ -257,12 +292,23 @@ export default function App() {
       masterPrompt: currentPrompt,
     };
 
-    setSavedLibrary((prev) => [newItem, ...prev]);
+    try {
+      const nextLibrary = [newItem, ...savedLibrary];
+      localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(nextLibrary));
+      setSavedLibrary(nextLibrary);
+    } catch {
+      showToast('This browser could not save your prompt. Free storage or copy your output, then try again.');
+      return false;
+    }
     showToast(`Saved "${title}" to your Prompt Library!`);
+    // Drive failure must never roll back or interrupt a successful local save.
+    void Promise.resolve().then(() => enqueueDriveBackup({ projectId, title, savedAt: newItem.createdAt, state: newItem.state })).catch(() => { /* The backup panel reports errors and reconnect requirements. */ });
+    return true;
   };
 
   // Load prompt from library
   const handleLoadFromLibrary = (item: SavedPromptItem) => {
+    setProjectId(safeProjectId(item.projectId || item.id));
     const loaded=normalizeStudioState(item.state);setPresetState(loaded);setAutomaticFingerprint(null);
     applyProduction(loaded,item.masterPrompt,(item as SavedPromptItem & {overrideText?:string}).overrideText??(item.masterPrompt!==buildMasterPrompt(loaded)?item.masterPrompt:''));
     setActiveView('builder');
@@ -455,8 +501,9 @@ export default function App() {
         {activeView === 'characters' && <CharacterPlanner state={presetState} onChange={setPresetState} />}
 
         <div hidden={activeView !== 'templates'}>
-          <TemplatesWorkspace state={presetState} onApply={handleApplyTemplate} />
+          <TemplatesWorkspace state={presetState} onApply={handleApplyTemplate} onApplyMany={handleApplyTemplates} />
           <ProjectBackups projects={projectBackups} onRestore={handleRestoreProject} />
+          <DriveBackupPanel />
         </div>
 
         {activeView === 'canvases' && (
@@ -468,6 +515,8 @@ export default function App() {
         )}
 
       </main>
+
+      <footer className="max-w-6xl mx-auto w-full px-4 sm:px-6 py-6 text-sm text-neutral-600 flex flex-wrap gap-x-5 gap-y-2"><a href="https://glamhustlehub.com" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">Visit Glam Hustle Hub</a><a href="https://payhip.com/b/54LoK" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">Join the Glam Vault</a></footer>
 
       {/* Bottom Button Bar */}
       <ButtonBar

@@ -4,7 +4,7 @@ import { Bookmark, X } from 'lucide-react';
 interface SavePromptDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (title: string) => void;
+  onSave: (title: string) => boolean | void;
   defaultTitle: string;
 }
 
@@ -28,8 +28,7 @@ export const SavePromptDialog: React.FC<SavePromptDialogProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (title.trim()) {
-      onSave(title.trim());
-      onClose();
+      if (onSave(title.trim()) !== false) onClose();
     }
   };
 

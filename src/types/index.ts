@@ -127,6 +127,7 @@ export interface CanvasItem {
 }
 
 export interface SavedPromptItem {
+  projectId?: string;
   id: string;
   title: string;
   createdAt: string;

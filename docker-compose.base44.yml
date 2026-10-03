@@ -11,7 +11,7 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3000
-      __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS: ${__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS}
+      __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS: ${__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS:-}
     restart: on-failure
     healthcheck:
       test: ["CMD", "node", "-e", "Promise.all(['/', '/src/main.tsx'].map(async path => { const r = await fetch('http://127.0.0.1:3000' + path, {signal: AbortSignal.timeout(4000)}); if (!r.ok) throw Error(path + ' failed: ' + r.status); })).catch(e => { console.error(e.message); process.exit(1); })"]

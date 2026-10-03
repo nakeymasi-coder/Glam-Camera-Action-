@@ -1,0 +1,13 @@
+# Local production smoke test. Hosting, TLS and domain are chosen separately.
+services:
+  web:
+    build:
+      context: .
+      target: runtime
+    ports:
+      - "${HOST_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    init: true
+    restart: unless-stopped

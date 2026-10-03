@@ -51,6 +51,13 @@ export function validateCharacters(value: unknown) {
 export function sceneBeat(details: OptionalStoryDetails, scene: number): string {
   return [details.scene1Beat, details.scene2Beat, details.scene3Beat][scene - 1] || '';
 }
+/** Emotional handoffs follow scene numbers even when imported links are unsorted. */
+export function incomingCharacterEmotion(character: StoryCharacter, scene: number): string {
+  const previous = character.scenes
+    .filter(link => link.linked && link.scene < scene && link.emotion.trim())
+    .sort((a, b) => a.scene - b.scene).at(-1);
+  return previous?.emotion || character.startingEmotion || '';
+}
 export function characterIdentityContract(characters: StoryCharacter[]): string {
   if (!characters.length) return '';
   return ['CHARACTER ROSTER — STABLE IDENTITY & ARC INTENT',
@@ -63,8 +70,7 @@ export function characterSceneContract(characters: StoryCharacter[], scene: numb
   return [`SCENE ${scene} — LINKED CHARACTER ARCS`, ...characters.map(c => {
     const link = c.scenes.find(l => l.scene === scene);
     if (!link?.linked) return `${c.name || 'Unnamed character'}: not linked to this event. Do not invent participation in this scene.`;
-    const previous = c.scenes.filter(l => l.linked && l.scene < scene && l.emotion.trim()).at(-1);
-    return [c.name || 'Unnamed character', `Incoming emotional state: ${previous?.emotion || c.startingEmotion || 'Unspecified; preserve previously established state.'}`,
+    return [c.name || 'Unnamed character', `Incoming emotional state: ${incomingCharacterEmotion(c, scene) || 'Unspecified; preserve previously established state.'}`,
       link.action.trim() ? `Action / contribution to this event:\n${link.action}` : 'Contribution unspecified; follow the scene beat without inventing a new goal.',
       link.emotion.trim() ? `Emotional state after this event:\n${link.emotion}` : 'No explicit emotional change; carry forward the incoming state.',
       'Show the event causing any emotional change. Retain established relationships, appearance and continuity anchors.',
