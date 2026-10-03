@@ -35,7 +35,7 @@ export function CreativeBriefFields({state,onChange}:{state:PresetState;onChange
   const persist=(next:SavedChoices)=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify(next));setSaved(next);return true}catch{setNotice('Your browser could not save this choice. Your current text is still here.');return false}};
   const save=(category:string,field:string)=>{const value=valueFor(field).trim();if(!value)return;if((saved[category]||[]).some(x=>key(x)===key(value))){setNotice('That choice is already saved.');return;}if(persist({...saved,[category]:[...(saved[category]||[]),value]}))setNotice('Choice saved in this browser.');};
   const choose=(field:string,value:string,label:string)=>{if(!value)return;if(valueFor(field).trim()&&key(valueFor(field))!==key(value)){setPending({field,value,label});return;}setField(field,value);};
-  return <section className="gca-brief bg-white rounded-xl border border-neutral-200 shadow-sm p-4 sm:p-6">
+  return <section id="creative-brief" className="scroll-mt-24 gca-brief bg-white rounded-xl border border-neutral-200 shadow-sm p-4 sm:p-6">
     <details>
       <summary className="cursor-pointer font-bold text-base">Story details & reusable choices <span className="font-normal text-xs text-neutral-500">Optional director controls</span></summary>
       <p className="text-xs text-neutral-600 my-3">Your written direction takes priority. Saved choices stay in this browser; your existing local library and optional Google cloud sync are unchanged.</p>

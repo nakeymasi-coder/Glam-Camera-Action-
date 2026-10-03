@@ -1,4 +1,5 @@
 import React from 'react';
+import { PRODUCTION_FIELDS } from './ProductionDetails';
 import { CHARACTER_TYPE_HELPERS } from '../studio-core/promptEngine';
 import { PresetState } from '../types';
 import { CHARACTER_CREATIVE_BEHAVIORS } from '../data/presetsData';
@@ -127,6 +128,12 @@ export const StoryBibleViewer: React.FC<StoryBibleViewerProps> = ({ state }) => 
           )}
         </div>
       </div>
+
+      <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
+        <h3 className="font-bold text-sm mb-3">Explicit direction & scene handoffs</h3>
+        <p className="text-xs text-neutral-600 mb-4">These literal notes guide generation; they are not an automatic continuity audit. Each scene carries forward established identity, prop state and consequences unless you specify a change.</p>
+        <dl className="grid gap-4 md:grid-cols-2">{PRODUCTION_FIELDS.map(([field, label]) => <div key={field}><dt className="font-semibold text-xs">{label}</dt><dd className="text-sm text-neutral-700 mt-1 whitespace-pre-wrap break-words">{state.optionalDetails[field] || 'Not supplied — automatic planning defaults apply.'}</dd></div>)}</dl>
+      </section>
 
       {/* Quality Rules Checklist from Page 9 */}
       <div className="bg-amber-100 text-neutral-900 rounded-xl p-5 sm:p-6 shadow-sm">

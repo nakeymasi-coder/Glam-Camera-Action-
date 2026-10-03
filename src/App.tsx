@@ -27,6 +27,8 @@ import {
 } from './data/presetsData';
 import { buildMasterPrompt, createProduction, normalizeStudioState, createLocalStarterRotation, CHARACTER_TYPE_OPTIONS as STUDIO_CHARACTERS, STORY_GENRE_OPTIONS as STUDIO_GENRES, VISUAL_STYLE_OPTIONS as STUDIO_STYLES, VIDEO_FORMAT_OPTIONS as STUDIO_FORMATS, ENERGY_TONE_OPTIONS as STUDIO_TONES } from './utils/studioAdapter';
 import { CreativeBriefFields } from './components/CreativeBriefFields';
+import { BuilderGuidance } from './components/BuilderGuidance';
+import { ProductionDetails } from './components/ProductionDetails';
 import { LocalPlanningDesk } from './components/LocalPlanningDesk';
 
 import { Header } from './components/Header';
@@ -317,6 +319,7 @@ export default function App() {
         {activeView === 'builder' && (
           <div className="gca-builder space-y-6 sm:space-y-8">
             <div className="gca-section-intro"><span>THE STORY ROOM</span><h2>Make it yours.</h2><p>Start with an idea, then open each direction below to shape its world.</p></div>
+            <BuilderGuidance state={presetState} hasPrompt={hasGeneratedOnce} briefChanged={briefChanged} onGenerate={handleGenerate} />
             <StoryIdeaInput value={presetState.storyIdea} onChange={(val) => handleUpdate('storyIdea', val)} />
             {/* Step 1: Character Type */}
             <StepPresetCard
@@ -387,6 +390,7 @@ export default function App() {
 
             {/* Optional Story Details Collapsible with Target Duration Dropdown */}
             <CreativeBriefFields state={presetState} onChange={setPresetState} />
+            <ProductionDetails state={presetState} onChange={setPresetState} />
 
             {/* Master Prompt Output Panel */}
             {hasGeneratedOnce && (

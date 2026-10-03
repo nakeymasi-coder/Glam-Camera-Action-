@@ -66,6 +66,19 @@ export interface OptionalStoryDetails {
   targetAudience: string;
   productServiceCTA: string;
   targetDuration: string;
+  era?: string;
+  storyGoal?: string;
+  obstacle?: string;
+  endingChange?: string;
+  characterGoals?: string;
+  productService?: string;
+  callToAction?: string;
+  cameraDirection?: string;
+  atmosphereDetails?: string;
+  continuityNotes?: string;
+  scene1Beat?: string;
+  scene2Beat?: string;
+  scene3Beat?: string;
 }
 
 export interface PresetState {

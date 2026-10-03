@@ -59,6 +59,12 @@ export interface PresetState {
     characterGoals?: string;
     productService?: string;
     callToAction?: string;
+    cameraDirection?: string;
+    atmosphereDetails?: string;
+    continuityNotes?: string;
+    scene1Beat?: string;
+    scene2Beat?: string;
+    scene3Beat?: string;
   };
 }
 export interface CanvasItem {
@@ -139,6 +145,12 @@ export function normalizeStudioState(saved?: unknown): PresetState {
       characterGoals: stringValue(details.characterGoals),
       productService: stringValue(details.productService),
       callToAction: stringValue(details.callToAction),
+      cameraDirection: stringValue(details.cameraDirection),
+      atmosphereDetails: stringValue(details.atmosphereDetails),
+      continuityNotes: stringValue(details.continuityNotes),
+      scene1Beat: stringValue(details.scene1Beat),
+      scene2Beat: stringValue(details.scene2Beat),
+      scene3Beat: stringValue(details.scene3Beat),
     },
   };
 }
@@ -236,6 +248,9 @@ function literalContract(snapshot: ProductionSnapshot): string {
     if (values.length) put(label, values.join('\n'));
   }
   for (const [key, label] of [
+    ['cameraDirection', 'Explicit camera & composition (overrides automatic shot / camera defaults)'],
+    ['atmosphereDetails', 'Explicit lighting, texture & sound (overrides automatic atmosphere defaults)'],
+    ['continuityNotes', 'Continuity anchors & permitted story-driven changes'],
     ['characterNames', 'Character names & descriptions'], ['settingLocation', 'Setting'],
     ['storyGoal', 'Story goal'], ['obstacle', 'Obstacle / stakes'],
     ['endingChange', 'Ending / what changes'], ['characterGoals', 'Character goals'],
@@ -278,10 +293,31 @@ export function createProduction(input?: unknown, overrideText?: string): Produc
   const appendix = literalContract(snapshot);
   const append = (text: string) => appendix ? `${text}\n\n${appendix}` : text;
   const plan = buildCanvasPlan(canvasInput(canonical));
+  const details = snapshot.state.optionalDetails;
+  const directorPlan = buildDirectorPlan(canonical);
+  if (details.cameraDirection?.trim()) {
+    directorPlan.framing = details.cameraDirection;
+    directorPlan.scenes = directorPlan.scenes.map(scene => ({ ...scene, camera: details.cameraDirection! }));
+  }
+  if (details.atmosphereDetails?.trim()) directorPlan.lighting = details.atmosphereDetails;
+  if (details.continuityNotes?.trim()) directorPlan.continuity.push(details.continuityNotes);
+  const beats = [details.scene1Beat, details.scene2Beat, details.scene3Beat];
+  directorPlan.scenes = directorPlan.scenes.map((scene, index) => ({ ...scene, storyCue: beats[index]?.trim() ? beats[index] : scene.storyCue }));
+  const sceneDirection = (scene: number) => {
+    const beat = beats[scene - 1];
+    const previous = beats[scene - 2];
+    return [
+      `SCENE ${scene} — EXPLICIT BEAT & CONTINUITY HANDOFF`,
+      beat?.trim() ? `This scene's supplied beat (priority over automatic story cues):\n${beat}` : 'Use the shared story goal and automatic scene role; no explicit beat supplied.',
+      scene > 1 ? `Carry forward the preceding scene's final character positions, prop ownership / condition and emotional state. Show the consequence before introducing new action.${previous?.trim() ? '\nPrevious beat — reference only, do not replay:\n' + previous : ''}` : 'Establish character identity, geography and recurring prop state for later scenes.',
+      scene < 3 ? 'End with a clear action, discovery or changed state that motivates the next scene. Do not resolve a later beat early.' : 'Pay off the preceding change; do not reset props or undo character progress without an explicit story reason.',
+    ].join('\n\n');
+  };
+  const hasBeats = beats.some(beat => beat?.trim());
   return {
     snapshot,
-    prompt: append(generateMasterPrompt(canonical)),
-    directorPlan: buildDirectorPlan(canonical),
+    prompt: append(generateMasterPrompt(canonical)) + (hasBeats ? '\n\n' + [1, 2, 3].map(sceneDirection).join('\n\n') : ''),
+    directorPlan,
     canvases: plan.canvases.map(canvas => ({
       id: canvas.number,
       canvasNumber: canvas.number,
@@ -289,7 +325,7 @@ export function createProduction(input?: unknown, overrideText?: string): Produc
       title: canvas.title,
       sceneIndex: canvas.scene as 1 | 2 | 3,
       purpose: canvas.role,
-      content: append(canvas.instructions),
+      content: append(canvas.instructions) + (hasBeats ? '\n\n' + sceneDirection(canvas.scene) : ''),
     })),
     notice: 'Local structured planning templates, not AI-written finished scenes or rendered images. The versioned production snapshot is the shared source for the master prompt, six canvases, and director plan.' +
       (snapshot.overrideText.trim() ? ' Literal override text is included in the master prompt and all six canvases; it is not parsed into the displayed director plan. Edit the structured snapshot for synchronized runtime, cast, or story changes.' : ''),
