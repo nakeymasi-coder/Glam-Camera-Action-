@@ -1,0 +1,23 @@
+services:
+  web:
+    image: node:22
+    working_dir: /app
+    volumes:
+      - ./:/app
+    ports:
+      - "3000:3000"
+    env_file:
+      - /run/base44/app.env
+    environment:
+      - PORT=3000
+      - NODE_ENV=development
+      - DISABLE_HMR=true
+      - __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS
+    command: ["sh", "-ec", "npm install -g bun && bun install --frozen-lockfile && exec npx tsx server.ts"]
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
