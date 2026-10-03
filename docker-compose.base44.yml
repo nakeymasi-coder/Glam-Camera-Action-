@@ -1,0 +1,32 @@
+services:
+  app:
+    image: node:22-bookworm
+    working_dir: /app
+    restart: on-failure
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    env_file:
+      - /run/base44/app.env
+    environment:
+      NODE_ENV: development
+      PORT: "3000"
+      APP_URL: https://3000-${BASE44_PUBLIC_HOST_SUFFIX}
+      DISABLE_HMR: "false"
+      CHOKIDAR_USEPOLLING: "true"
+      __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS:
+    command: ["sh", "-ec", "npm install --global bun@1.4.2 && bun install --frozen-lockfile && exec node --watch-path=server.ts --import tsx server.ts"]
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "Promise.all([fetch('http://127.0.0.1:3000/').then(async r => { if (!r.ok || !(await r.text()).includes('/src/main.tsx')) throw new Error('Frontend unavailable'); }), fetch('http://127.0.0.1:3000/api/gemini/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'}).then(async r => { if (r.status !== 400 || (await r.json()).error !== 'messages array is required') throw new Error('Backend unavailable'); })]).catch(e => { console.error(e.message); process.exit(1); })"
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
+volumes:
+  node_modules:
