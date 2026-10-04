@@ -12,15 +12,15 @@ import {
   collection,
   doc,
   setDoc,
-  getDocs,
-  deleteDoc,
-  query,
-  orderBy,
-  serverTimestamp,
+  getDocsFromServer,
+  runTransaction,
 } from 'firebase/firestore';
 
 // Import configuration from provisioned file
 import firebaseConfig from '../../firebase-applet-config.json';
+import { createCloudProjectStore } from '../utils/cloudProjects';
+import { createWorkspaceStorage } from '../utils/workspaceStorage';
+import { CLOUD_LIBRARY_STORAGE_KEY } from '../utils/cloudLibrary';
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
@@ -60,25 +60,31 @@ export const signOutUser = async (): Promise<void> => {
 export { onAuthStateChanged };
 export type { User };
 
-// Firestore story persistence functions
-export async function saveStoryToCloud(userId: string, story: any) {
-  const storyRef = doc(db, 'users', userId, 'stories', story.id);
-  await setDoc(storyRef, {
-    ...story,
-    userId,
-    updatedAt: new Date().toISOString(),
-  });
-}
-
-export async function fetchStoriesFromCloud(userId: string) {
-  const storiesRef = collection(db, 'users', userId, 'stories');
-  const snapshot = await getDocs(storiesRef);
-  const items: any[] = [];
-  snapshot.forEach((d) => items.push(d.data()));
-  return items;
-}
-
-export async function deleteStoryFromCloud(userId: string, storyId: string) {
-  const storyRef = doc(db, 'users', userId, 'stories', storyId);
-  await deleteDoc(storyRef);
-}
+// All project mutation paths use this barrier; profiles/auth remain independent.
+export const cloudProjects = createCloudProjectStore({
+  currentUid: () => auth.currentUser?.uid ?? null,
+  removeCachedCopies(uid, ids) {
+    // Run even after an account switch/unmount, against the original account only.
+    const storage = createWorkspaceStorage(uid);
+    const raw = storage.getItem(CLOUD_LIBRARY_STORAGE_KEY);
+    if (raw === null) return;
+    const cached = JSON.parse(raw);
+    if (!Array.isArray(cached) || cached.some(item => !item || typeof item.id !== 'string')) throw Error('The cloud cache could not be safely updated.');
+    storage.setItem(CLOUD_LIBRARY_STORAGE_KEY, JSON.stringify(cached.filter(item => !ids.includes(item.id))));
+  },
+  async listFromServer(uid) {
+    const snapshot = await getDocsFromServer(collection(db, 'users', uid, 'stories'));
+    return snapshot.docs.map(document => ({ id: document.id, data: document.data() }));
+  },
+  async transact(uid, id, decide) {
+    const reference = doc(db, 'users', uid, 'stories', id);
+    await runTransaction(db, async transaction => {
+      const snapshot = await transaction.get(reference);
+      const action = decide(snapshot.exists() ? snapshot.data() : null);
+      if (action.kind === 'set') transaction.set(reference, action.data);
+      else if (action.kind === 'delete') transaction.delete(reference);
+    });
+  },
+});
+export const saveStoryToCloud = (uid: string, story: any, isCurrent: () => boolean) => cloudProjects.save(uid, story, isCurrent);
+export const fetchStoriesFromCloud = (uid: string) => cloudProjects.fetch(uid);

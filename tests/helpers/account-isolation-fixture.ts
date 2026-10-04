@@ -12,7 +12,7 @@ type Modules = {
   App: typeof import('../../src/App').default;
   AppWorkspace: typeof import('../../src/App').AppWorkspace;
   useCloudSession: typeof import('../../src/hooks/useCloudSession').useCloudSession;
-} & typeof import('../../src/utils/workspaceStorage');
+} & typeof import('../../src/utils/workspaceStorage') & typeof import('../../src/lib/firebase');
 
 export function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -27,7 +27,7 @@ export const fixtureUser = (uid: string): User => ({
 // Real App, AuthBar and all storage-consuming React components are mounted.
 // Only external Firebase/Drive boundaries are replaced. No real account,
 // network, existing browser profile or production storage is accessed.
-export async function accountFixture() {
+export async function accountFixture(options: { realCloudWrapper?: boolean } = {}) {
   const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', { url: 'http://localhost/' });
   const originalGlobals = new Map<string, PropertyDescriptor | undefined>();
   const globalValues = {
@@ -63,8 +63,49 @@ export async function accountFixture() {
     static createObjectURL(blob: Blob) { blobs.push(blob); return `blob:fixture/${blobs.length}`; }
     static revokeObjectURL(_url: string) {}
   }
+  const cloudRecords = new Map<string, Record<string, any>>();
+  const sdkCalls = { serverReads: [] as string[], transactions: [] as string[], writes: [] as string[], deletes: [] as string[] };
+  const serverReads: { uid: string; pending: ReturnType<typeof deferred<any>> }[] = [];
+  const transactionHooks: { before?: (path: string) => Promise<void>; afterDecide?: () => Promise<void>; fail: Set<string> } = { fail: new Set() };
+  const snapshot = (path: string, data: Record<string, any> | undefined) => ({ id: path.split('/').at(-1), exists: () => data !== undefined, data: () => data });
+  const sdk = {
+    getApps: () => [{}], getApp: () => ({}), initializeApp: () => ({}), getAuth: () => auth, getFirestore: () => ({}),
+    GoogleAuthProvider: class { setCustomParameters() {} },
+    signInWithPopup: async () => { throw Error('Real login is forbidden'); },
+    signOut: async () => { dispatch(null); },
+    onAuthStateChanged: (_auth: unknown, listener: (user: User | null) => void) => {
+      calls.subscriptions++; listeners.add(listener); return () => { calls.unsubscriptions++; listeners.delete(listener); };
+    },
+    doc: (_db: unknown, ...segments: string[]) => segments.join('/'),
+    collection: (_db: unknown, ...segments: string[]) => segments.join('/'),
+    setDoc: async () => { throw Error('Profile writes are forbidden in deletion tests'); },
+    getDocsFromServer: async (path: string) => {
+      sdkCalls.serverReads.push(path);
+      const pending = deferred<any>(); serverReads.push({ uid: path.split('/')[1], pending });
+      return pending.promise;
+    },
+    runTransaction: async (_db: unknown, action: (transaction: any) => Promise<void>) => {
+      const operations: { kind: string; path: string; data?: any }[] = [];
+      await action({
+        get: async (path: string) => {
+          sdkCalls.transactions.push(path);
+          if (transactionHooks.before) await transactionHooks.before(path);
+          if (transactionHooks.fail.has(path)) throw Error('Synthetic transaction failure');
+          return snapshot(path, cloudRecords.get(path));
+        },
+        set: (path: string, data: any) => operations.push({ kind: 'set', path, data }),
+        delete: (path: string) => operations.push({ kind: 'delete', path }),
+      });
+      if (transactionHooks.afterDecide) await transactionHooks.afterDecide();
+      for (const op of operations) {
+        if (op.kind === 'delete') { sdkCalls.deletes.push(op.path); cloudRecords.delete(op.path); }
+        else { sdkCalls.writes.push(op.path); cloudRecords.set(op.path, op.data); }
+      }
+    },
+  };
   const firebase = {
     auth,
+    cloudProjects: { isBusy: () => false, subscribe: () => () => {}, filterDeleted: (_uid: string, items: unknown[]) => items },
     onAuthStateChanged(_auth: unknown, listener: (user: User | null) => void) {
       calls.subscriptions++;
       listeners.add(listener);
@@ -81,17 +122,21 @@ export async function accountFixture() {
   };
   const bundled = await build({
     stdin: {
-      contents: `export { default as App, AppWorkspace } from './src/App'; export { useCloudSession } from './src/hooks/useCloudSession'; export * from './src/utils/workspaceStorage';`,
+      contents: `export { default as App, AppWorkspace } from './src/App'; export { useCloudSession } from './src/hooks/useCloudSession'; export * from './src/utils/workspaceStorage'; export * from './src/lib/firebase';`,
       resolveDir: process.cwd(), loader: 'tsx',
     },
     bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external',
     define: { 'import.meta.env.VITE_DRIVE_BACKUP_DISABLED': 'true' },
     plugins: [{ name: 'synthetic-account-boundaries', setup(builder) {
-      builder.onResolve({ filter: /(?:^|\/)lib\/firebase$/ }, () => ({ path: 'firebase', namespace: 'account-fixture' }));
+      if (!options.realCloudWrapper) builder.onResolve({ filter: /(?:^|\/)lib\/firebase$/ }, () => ({ path: 'firebase', namespace: 'account-fixture' }));
+      if (options.realCloudWrapper) {
+        builder.onResolve({ filter: /^firebase\/(app|auth|firestore)$/ }, args => ({ path: args.path, namespace: 'sdk-fixture' }));
+        builder.onLoad({ filter: /.*/, namespace: 'sdk-fixture' }, () => ({ contents: `export const { getApps, getApp, initializeApp, getAuth, getFirestore, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, doc, collection, setDoc, getDocsFromServer, runTransaction } = fixture.sdk;`, loader: 'js' }));
+      }
       builder.onResolve({ filter: /(?:^|\/)utils\/driveBackup$/ }, () => ({ path: 'drive', namespace: 'account-fixture' }));
       builder.onResolve({ filter: /(?:^|\/)components\/DriveBackupPanel$/ }, () => ({ path: 'drive-panel', namespace: 'account-fixture' }));
       builder.onLoad({ filter: /.*/, namespace: 'account-fixture' }, args => ({ contents: args.path === 'firebase'
-        ? `export const { auth, onAuthStateChanged, fetchStoriesFromCloud, signInWithGoogle, signOutUser, saveStoryToCloud } = fixture.firebase;`
+        ? `export const { auth, onAuthStateChanged, fetchStoriesFromCloud, signInWithGoogle, signOutUser, saveStoryToCloud, cloudProjects } = fixture.firebase;`
         : args.path === 'drive-panel'
           ? `import React from 'react'; export const DriveBackupPanel = () => React.createElement('aside', {'data-drive-fixture': true});`
           : `export const enqueueDriveBackup = async (...args) => { fixture.calls.driveBackups.push(args); return {status: 'not-configured'}; };`, loader: 'js', resolveDir: process.cwd() }));
@@ -102,7 +147,7 @@ export async function accountFixture() {
   let timerId = 0;
   runInNewContext(bundled.outputFiles[0].text, {
     module, exports: module.exports, require,
-    fixture: { firebase, calls }, ...globalValues,
+    fixture: { firebase, calls, sdk }, ...globalValues,
     crypto: globalThis.crypto, TextEncoder, TextDecoder, Blob, URL: FixtureURL,
     URLSearchParams, AbortController, structuredClone,
     console: { ...console, error: (...args: unknown[]) => errors.push(args) },
@@ -115,6 +160,12 @@ export async function accountFixture() {
   let mounted = true;
   return {
     ...module.exports, dom, root, auth, calls, requests, downloads, blobs, errors, dispatchAuth: dispatch,
+    cloudRecords, sdkCalls, serverReads, transactionHooks,
+    async resolveServer(index: number, records?: { id: string; data: Record<string, any> }[]) {
+      const uid = serverReads[index].uid;
+      const rows = records ?? [...cloudRecords].filter(([path]) => path.startsWith(`users/${uid}/stories/`)).map(([path, data]) => ({ id: path.split('/').at(-1)!, data }));
+      await act(async () => { serverReads[index].pending.resolve({ docs: rows.map(row => snapshot(`users/${uid}/stories/${row.id}`, row.data)) }); });
+    },
     document: dom.window.document, storage: dom.window.localStorage,
     get listenerCount() { return listeners.size; },
     async render(element: React.ReactNode) { await act(async () => { root.render(element); }); },

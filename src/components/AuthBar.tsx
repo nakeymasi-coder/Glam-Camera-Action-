@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { CloudProjectDeletion } from './CloudProjectDeletion';
 import {
   auth,
   signInWithGoogle,
   signOutUser,
   User,
   saveStoryToCloud,
+  cloudProjects,
 } from '../lib/firebase';
 import {
   LogIn,
@@ -33,6 +35,7 @@ export const AuthBar: React.FC<AuthBarProps> = ({
 }) => {
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isCloudReviewOpen, setIsCloudReviewOpen] = useState(false);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
@@ -59,7 +62,7 @@ export const AuthBar: React.FC<AuthBarProps> = ({
   };
 
   const handleSaveToFirestore = async () => {
-    if (recovery || !isSessionCurrent()) return;
+    if (recovery || !isSessionCurrent() || cloudProjects.isBusy()) return;
     if (!user) {
       handleSignIn();
       return;
@@ -73,7 +76,7 @@ export const AuthBar: React.FC<AuthBarProps> = ({
     if (auth.currentUser?.uid !== user.uid) return;
     setIsSyncing(true);
     try {
-      await saveStoryToCloud(user.uid, currentStory);
+      await saveStoryToCloud(user.uid, currentStory, () => mounted.current && isSessionCurrent());
       if (mounted.current && isSessionCurrent() && auth.currentUser?.uid === user.uid) onToast('Saved to Firebase Firestore cloud database!');
     } catch (err: any) {
       console.error(err);
@@ -132,7 +135,7 @@ export const AuthBar: React.FC<AuthBarProps> = ({
       <button
         type="button"
         onClick={handleSaveToFirestore}
-        disabled={isSyncing}
+        disabled={isSyncing || isCloudReviewOpen}
         className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded bg-neutral-900 text-white hover:bg-neutral-800 transition-colors shadow-xs"
         title="Save active story to your Firestore account"
       >
@@ -143,6 +146,8 @@ export const AuthBar: React.FC<AuthBarProps> = ({
         )}
         <span className="hidden md:inline">Save to Cloud</span>
       </button>
+
+      <CloudProjectDeletion user={user} isSessionCurrent={isSessionCurrent} onBusyChange={setIsCloudReviewOpen} />
 
       {/* User profile dropdown / avatar */}
       <div className="flex items-center gap-1.5 pl-1.5 border-l border-neutral-200">

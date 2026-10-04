@@ -39,7 +39,7 @@ import { enqueueDriveBackup } from './utils/driveBackup';
 import { createLocalId } from './utils/projectIds';
 import { LocalPlanningDesk } from './components/LocalPlanningDesk';
 import { useCloudSession } from './hooks/useCloudSession';
-import { auth, type User } from './lib/firebase';
+import { auth, cloudProjects, type User } from './lib/firebase';
 import { WorkspaceStorageContext, createWorkspaceStorage, useWorkspaceStorage, readLegacyBrowserData, downloadLegacyBrowserData, type WorkspaceStorage } from './utils/workspaceStorage';
 import { CLOUD_LIBRARY_STORAGE_KEY, readLibrary, mergeCloudStories } from './utils/cloudLibrary';
 
@@ -166,21 +166,27 @@ export function AppWorkspace({ user, cloudStories, recovery, isSessionCurrent, o
   // Cloud cache and local saves are separate, and both belong only to this workspace.
   const [cloudLibrary, setCloudLibrary] = useState<SavedPromptItem[]>(() => {
     if (!user || recovery) return [];
-    try { return readLibrary(storage.getItem(CLOUD_LIBRARY_STORAGE_KEY)); } catch { return []; }
+    try { return cloudProjects.filterDeleted(user.uid, readLibrary(storage.getItem(CLOUD_LIBRARY_STORAGE_KEY))); } catch { return []; }
   });
   const savedLibrary = useMemo(() => mergeCloudStories(localLibrary, cloudLibrary), [localLibrary, cloudLibrary]);
   useEffect(() => {
     if (!cloudStories || !user || recovery) return;
     try {
-      const checked = readLibrary(JSON.stringify(cloudStories.filter(item => !(item as any).userId || (item as any).userId === user.uid)));
+      const checked = readLibrary(JSON.stringify(cloudProjects.filterDeleted(user.uid, cloudStories).filter(item => !(item as any).userId || (item as any).userId === user.uid)));
       setCloudLibrary(previous => mergeCloudStories(previous, checked));
     } catch { showToast('Some cloud stories could not be read. Your saved browser work is unchanged.'); }
   }, [cloudStories, user, recovery, showToast]);
   useEffect(() => {
-    if (!user || recovery || !cloudLibrary.length) return;
+    if (!user || recovery) return;
     try { storage.setItem(CLOUD_LIBRARY_STORAGE_KEY, JSON.stringify(cloudLibrary)); }
     catch { showToast('Cloud stories loaded, but this browser could not cache them.'); }
   }, [cloudLibrary, storage, user, recovery, showToast]);
+
+  useEffect(() => cloudProjects.subscribe(change => {
+    if (!user || recovery || change.uid !== user.uid || !change.deletedIds.length) return;
+    // Only the derived cloud cache is invalidated. Local saves, draft and backups stay intact.
+    setCloudLibrary(previous => previous.filter(item => !change.deletedIds.includes(item.id)));
+  }), [user, recovery]);
 
   // Keyboard shortcut: Cmd/Ctrl + Enter to generate
   useEffect(() => {
@@ -396,7 +402,8 @@ export function AppWorkspace({ user, cloudStories, recovery, isSessionCurrent, o
   const currentStoryObject = useMemo(() => {
     const activeState=hasGeneratedOnce?productionState:presetState;
     return {
-      id: `story-${Date.now()}`,
+      id: projectId,
+      projectId,
       title: activeState.storyIdea ? activeState.storyIdea.slice(0, 40) : 'My Three-Scene Story',
       masterPrompt: generatedPrompt || buildMasterPrompt(presetState),
       targetDuration: activeState.optionalDetails.targetDuration || '',
@@ -404,7 +411,7 @@ export function AppWorkspace({ user, cloudStories, recovery, isSessionCurrent, o
       overrideText: manualOverride,
       createdAt: new Date().toISOString(),
     };
-  }, [presetState, productionState, manualOverride, hasGeneratedOnce, generatedPrompt]);
+  }, [projectId, presetState, productionState, manualOverride, hasGeneratedOnce, generatedPrompt]);
 
   return (
     <div className="gca-app min-h-screen flex flex-col antialiased">

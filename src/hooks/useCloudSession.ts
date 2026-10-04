@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { auth, onAuthStateChanged, fetchStoriesFromCloud, type User } from '../lib/firebase';
+import { auth, onAuthStateChanged, fetchStoriesFromCloud, cloudProjects, type User } from '../lib/firebase';
 import type { SavedPromptItem } from '../types';
 
 export interface CloudSession {
@@ -25,7 +25,7 @@ export function useCloudSession(): CloudSession {
       setSession({ ready: true, user: currentUser, generation, cloudStories: null, isCurrent: () => active && requestGeneration === generation && uid === nextUid });
       if (nextUid === null) return;
       void fetchStoriesFromCloud(nextUid).then(stories => {
-        if (!active || requestGeneration !== generation || uid !== nextUid) return;
+        if (!active || requestGeneration !== generation || uid !== nextUid || stories === null) return;
         setSession(previous => previous.generation === requestGeneration
           ? { ...previous, cloudStories: stories }
           : previous);
@@ -33,7 +33,13 @@ export function useCloudSession(): CloudSession {
         if (active && requestGeneration === generation) console.error('Could not read this account’s cloud stories:', error);
       });
     });
-    return () => { active = false; ++generation; unsubscribe(); };
+    const unsubscribeMutations = cloudProjects.subscribe(change => {
+      if (!active || change.uid !== uid || !change.deletedIds.length) return;
+      setSession(previous => previous.user?.uid === change.uid && previous.cloudStories
+        ? { ...previous, cloudStories: previous.cloudStories.filter(story => !change.deletedIds.includes(story.id)) }
+        : previous);
+    });
+    return () => { active = false; ++generation; unsubscribe(); unsubscribeMutations(); };
   }, []);
   return session;
 }
