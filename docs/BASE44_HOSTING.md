@@ -4,9 +4,9 @@ The existing application can produce a separate static frontend for Base44 SPA h
 
 ## Important feature boundary
 
-Base44 site hosting uploads the built frontend; it does not run this repository's Express server. The Base44 build therefore sets the non-secret `VITE_DRIVE_BACKUP_DISABLED=true` flag. The visible Drive panel says private backup is pending/unavailable, keeps Connect disabled, and makes no Drive API, token or redirect requests. Local Save remains available. This is not a completed Google Drive integration.
+Base44 site hosting uploads the built frontend; it does not run this repository's Express server. The Base44 build sets `VITE_DRIVE_BACKUP_MODE=browser` and disables Express Drive routes. Its browser-only Drive connection requests per-user `drive.file` permission through a separate Firebase Google reauthentication popup. Local Save remains independent; only a connected user's explicit successful Save queues the saved snapshot. Google tokens stay in memory and never enter browser storage. Reload/expiry requires reconnection, and closing the page can interrupt backup.
 
-The existing per-user Express Drive implementation remains in source for future work. Enabling Drive on Base44 requires a separately reviewed per-user backend implementation and explicit OAuth/security approval. Do not replace it with Base44's shared app-scoped Drive connector. Do not change Firebase auth/data/rules as part of site publication.
+The existing per-user Express Drive implementation remains in source for Node deployments. The user reported enabling Drive and Docs APIs in the existing Google project; production consent and an actual document save still need live validation. See `DRIVE_BACKUP.md` for setup and durability limits. Do not use Base44's shared builder Drive connector, silently grant OAuth, or change Firebase auth/data/rules as part of site publication.
 
 ## Build
 
@@ -25,7 +25,7 @@ Use the official CLI only after the user approves its account connection and the
 
 With approved authentication, link the intended existing app using `npx base44 link --app-id <verified existing app ID>`. Confirm the returned target before publication. Run the site-only command `npx base44 site deploy --no-build` from this project so only the verified frontend artifact is uploaded. Do not run the all-resources `npx base44 deploy` command; it is unnecessary for this Firebase-backed planner.
 
-The CLI reports the actual application URL only after successful publication. A successful GitHub push, Base Code preview or Create PR is not proof of publication. Verify the returned HTTPS URL, asset loading, browser interactions and disabled Drive status before sharing it as working.
+The CLI reports the actual application URL only after successful publication. A successful GitHub push, Base Code preview or Create PR is not proof of publication. Verify the returned HTTPS URL, asset loading, browser interactions and accurate Drive connection status. Do not report live backup verified until the user consents and both Google Docs writes are confirmed.
 
 ## Account-separated browser workspaces
 

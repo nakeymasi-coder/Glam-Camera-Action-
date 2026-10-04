@@ -31,6 +31,6 @@ Local Save Prompt and Library keep the original `scene_script_library_v1` storag
 
 Firebase authentication, configuration, Firestore database/rules and cloud story formats are preserved. Firebase's browser configuration is not a paid generative-AI key. Google sign-in and optional cloud Save still require the existing Firebase project to allow the app's origin.
 
-Private Google Drive backup remains disabled until separately approved server-side setup and individual user consent. Local saving works independently. See [private Drive backup notes](docs/DRIVE_BACKUP.md) and [story workflow notes](docs/STORY_WORKFLOWS.md).
+Base44 builds include a private, per-user browser Drive connection for on-Save Google Docs backups. Google Drive/Docs API enablement and each user’s explicit consent are required; live setup is not yet verified. Reconnect after page refresh or access expiry. Local saving works independently. See [private Drive backup notes](docs/DRIVE_BACKUP.md) and [story workflow notes](docs/STORY_WORKFLOWS.md).
 
 No public hosting target or URL is implied by a successful build. Publishing requires the selected deployment environment.

@@ -1,12 +1,44 @@
 # Private Google Drive backups
 
-## Current deployment status
+## Base44 static deployment: browser connection
 
-This feature is implemented but **disabled until secure server configuration and each user's explicit OAuth consent are supplied**. No client credentials, encryption keys, OAuth grants, remote documents, or live Google tests were created during implementation. A shared Base44 service-role Drive connector is deliberately not used: it would write multiple users' backups into one connected account.
+`npm run build:base44` now selects the browser-only per-user adapter. The existing Firebase Google sign-in and project configuration are unchanged. The normal Node/Express build retains its separate, disabled-until-configured server adapter below.
 
-Local Save Prompt works independently. Only after a successful local save does the app queue its saved production snapshot. Editing fields does not upload anything. Generate first when field edits should become the saved production snapshot. When generation has not run, the app's existing Save behavior uses the draft. The two Google Docs are managed snapshots: later saves replace the first document tab's text. Keep unique manual edits in another document.
+Connect Drive opens an explicit Firebase Google reauthentication popup with `drive.file` added to a separate provider instance. Google consent is completed by each user. The returned Google account must match the currently signed-in Firebase user and the Drive account reported by Google. There is no shared builder Drive, service-account grant, refresh token, client secret, or paid AI call.
 
-The UI never labels a backup synced until both document writes and their durable receipt succeed. A failure can leave one Google Doc newer than the other; the next Save retries the pair. Local data is unaffected. There are no paid AI calls.
+The Google API access token stays in memory for this page only. No Google token is written into localStorage, Firestore, URLs, logs, or exported files. Reloading the page requires reconnection; expired/revoked access fails visibly and requires another user click. A conservative 50-minute session cutoff avoids claiming indefinite access. Firebase's own existing sign-in persistence is separate and is not used to refresh Google Drive access.
+
+### Operator setup and live validation
+
+Enable Google Drive API and Google Docs API in the existing `glam-skill-studio` Google Cloud project, if not already enabled. Review the existing OAuth app audience/consent restrictions if Google rejects the connection. Creating or changing OAuth clients, credentials, scopes in Cloud Console, or Firebase security settings is not performed by this implementation.
+
+Official setup links: [Drive API](https://console.cloud.google.com/flows/enableapi?apiid=drive.googleapis.com) and [Docs API](https://console.cloud.google.com/flows/enableapi?apiid=docs.googleapis.com). Select the existing project. These are the exact links supplied by Google's official JavaScript quickstarts.
+
+On 2026-10-03 the available cloud browser returned “Site Unavailable” for Google Cloud Console. API enablement could not be independently verified or changed there. The user subsequently reported enabling both APIs in the existing project. No live OAuth grants or real Google Docs were created during implementation. The user must connect and save once before live backup can be called verified.
+
+### Save, isolation, and receipts
+
+- Local Save succeeds first. Only its immutable saved snapshot is queued; field edits and Generate do not upload. If fields changed after generation, Generate again before Save to update that snapshot.
+- Each connection, request, queue item, and UI result is bound to its original Firebase UID and cancellation generation. Account switching or disconnect cancels queued work and clears visible links. A request already accepted by Google may finish in the original account, never in the next user's account.
+- Browser Web Locks serialize saves across tabs on the same origin. Non-secret document IDs, pending-create markers, digests, and timestamps are stored under a hash of Firebase UID, Google Drive account ID, and project ID. No titles, story content, or Google tokens are added to these receipts.
+- The two app-managed Google Docs are reused. Existing docs are located using app-private hashed markers. Document revisions and saved timestamps reject conflicting or older writes. Both writes and the local receipt must succeed before the UI says backed up.
+- Every stored, discovered or newly created document ID is checked against Drive metadata before any content replacement: native Doc type, not trashed, current owner and the exact account/project/document-kind marker. A changed or damaged receipt cannot redirect a backup into an unrelated app-accessible document.
+- Permission failures clear the page's connection and queued credentials. Session age is checked after queue/lock waits, before and after Google requests, and before confirming success; expired work requires reconnection instead of continuing with an old token.
+- Google Docs do not support pre-generated IDs. Creation intent is journaled before the request. An uncertain create is searched for on the next Save and is not blindly repeated. If it remains missing, backup stays unconfirmed rather than creating a duplicate. Definitive provider rejection allows another explicit attempt.
+- The browser journal is not a server database: clearing site storage loses it, and Web Locks do not coordinate different devices. Avoid simultaneous first saves of the same project from different devices. Discovered duplicate markers fail visibly. A durable, distributed backend would be needed for stronger cross-device guarantees.
+- A failed second document write can leave a mixed pair; the next explicit Save retries with fresh revisions. Local data is unaffected. Leaving/closing this page can interrupt backup; there is no background service or scheduled upload.
+- Disconnect clears this page's token and pending work without deleting files. It does not silently revoke the Google OAuth app because the existing Google sign-in uses that app too. The UI explains how to revoke permission through Google Account connections.
+- Docs are human-readable snapshots, not full-library/JSON restores. Existing local and JSON backup tools remain the restore path. No sharing permissions are changed.
+
+### Checks
+
+Run `npm run lint`, `npm test`, `npm run build:base44`, `npm run build`, and `npm run test:production`. Browser adapter tests use synthetic Google responses only. Live consent, actual API enablement, production OAuth policies, and real private-document access remain a distinct user-authorized check.
+
+Official references: [Firebase Google provider scopes and access token](https://firebase.google.com/docs/auth/web/google-signin), [Firebase popup reauthentication](https://firebase.google.com/docs/reference/js/auth#reauthenticatewithpopup), [Drive per-file scope](https://developers.google.com/workspace/drive/api/guides/api-specific-auth), [Docs revision controls](https://developers.google.com/workspace/docs/api/reference/rest/v1/documents/batchUpdate).
+
+## Optional Node/Express deployment
+
+The remainder describes the original server adapter, not the Base44 browser deployment. It stays disabled until its separately approved secure configuration is provided.
 
 ## Minimal activation requirements
 

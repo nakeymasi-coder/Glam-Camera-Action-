@@ -1,11 +1,13 @@
 import { auth, onAuthStateChanged } from '../lib/firebase';
 import type { DriveBackupInput, DriveBackupResult, DriveBackupStatus } from './driveBackupTypes';
 import { DRIVE_NOT_CONFIGURED } from './driveBackupTypes';
+import { browserDriveClient } from './browserDriveClient';
 export type { DriveBackupInput, DriveBackupResult, DriveBackupStatus } from './driveBackupTypes';
 
 // Base44 serves the SPA without the optional Express Drive endpoints.
 // This public build flag contains no credentials; normal server builds keep using the adapter.
 const driveBackupDisabled = import.meta.env.VITE_DRIVE_BACKUP_DISABLED === 'true';
+const browserDriveMode = import.meta.env.VITE_DRIVE_BACKUP_MODE === 'browser';
 const staticDriveStatus = (): DriveBackupStatus => ({ configured: false, connected: false, message: 'Google Drive backup is unavailable in this Base44-hosted version. Private Drive setup is pending. Your local saves still work.' });
 export interface DriveBackupView { status: DriveBackupStatus | null; result: DriveBackupResult | null; busy: boolean; }
 let view: DriveBackupView = { status: driveBackupDisabled ? staticDriveStatus() : null, result: null, busy: false };
@@ -17,8 +19,9 @@ const pending = new Map<string, { timer: ReturnType<typeof setTimeout>; resolve:
 let serial: Promise<unknown> = Promise.resolve();
 const superseded = (): DriveBackupResult => ({ status: 'superseded', message: 'This Drive request was cancelled or replaced. Your local save is safe.' });
 function publish(patch: Partial<DriveBackupView>) { view = { ...view, ...patch }; listeners.forEach(listener => listener(view)); }
-export function subscribeDriveBackup(listener: (view: DriveBackupView) => void) { listeners.add(listener); listener(view); return () => { listeners.delete(listener); }; }
+export function subscribeDriveBackup(listener: (view: DriveBackupView) => void) { if (browserDriveMode) return browserDriveClient.subscribe(listener); listeners.add(listener); listener(view); return () => { listeners.delete(listener); }; }
 export function cancelPendingDriveBackups() {
+  if (browserDriveMode) { browserDriveClient.cancel(); return; }
   epoch++;
   for (const item of pending.values()) { clearTimeout(item.timer); item.resolve(superseded()); }
   pending.clear();
@@ -27,6 +30,7 @@ export function cancelPendingDriveBackups() {
   publish({ result: null, busy: false });
 }
 onAuthStateChanged(auth, user => {
+  if (browserDriveMode) return;
   if ((user?.uid || null) !== owner) { cancelPendingDriveBackups(); owner = user?.uid || null; publish({ status: driveBackupDisabled ? staticDriveStatus() : null, result: null }); }
 });
 const sameOwner = (uid: string | null, version: number) => version === epoch && (auth.currentUser?.uid || null) === uid;
@@ -48,6 +52,7 @@ async function api(path: string, method: 'GET' | 'POST', uid: string | null, ver
   } finally { clearTimeout(timer); active.delete(controller); }
 }
 export async function getDriveBackupStatus(): Promise<DriveBackupStatus> {
+  if (browserDriveMode) return browserDriveClient.getStatus();
   if (driveBackupDisabled) {
     const status = staticDriveStatus();
     publish({ status });
@@ -60,6 +65,7 @@ export async function getDriveBackupStatus(): Promise<DriveBackupStatus> {
   return status;
 }
 export async function connectDriveBackup(): Promise<void> {
+  if (browserDriveMode) return browserDriveClient.connect();
   if (driveBackupDisabled) throw Error(staticDriveStatus().message);
   if (!auth.currentUser) throw Error('Use Sign in with Google first, then connect Drive.');
   const uid = auth.currentUser.uid, version = epoch;
@@ -71,6 +77,7 @@ export async function connectDriveBackup(): Promise<void> {
   if (sameOwner(uid, version)) window.location.assign(url.href);
 }
 export async function disconnectDriveBackup(): Promise<DriveBackupStatus> {
+  if (browserDriveMode) return browserDriveClient.disconnect();
   cancelPendingDriveBackups();
   if (driveBackupDisabled) return getDriveBackupStatus();
   const uid = auth.currentUser?.uid || null, version = epoch;
@@ -81,6 +88,7 @@ export async function disconnectDriveBackup(): Promise<DriveBackupStatus> {
 }
 /** Call only AFTER the requested local Save succeeds. Explicit Save only, never on edits. */
 export function enqueueDriveBackup(input: DriveBackupInput): Promise<DriveBackupResult> {
+  if (browserDriveMode) return browserDriveClient.enqueue(input);
   if (driveBackupDisabled) {
     const status = staticDriveStatus();
     const result: DriveBackupResult = { status: 'not-configured', message: status.message };

@@ -19,7 +19,7 @@ async function clientFixture(disabled: boolean | undefined, signedIn: boolean) {
   let authListener: (user: FixtureUser) => void = () => {};
   const bundled = await build({
     entryPoints: ['src/utils/driveBackup.ts'], bundle: true, write: false, format: 'cjs', platform: 'browser',
-    define: { 'import.meta.env.VITE_DRIVE_BACKUP_DISABLED': disabled === undefined ? 'undefined' : JSON.stringify(String(disabled)) },
+    define: { 'import.meta.env.VITE_DRIVE_BACKUP_DISABLED': disabled === undefined ? 'undefined' : JSON.stringify(String(disabled)), 'import.meta.env.VITE_DRIVE_BACKUP_MODE': 'undefined' },
     plugins: [{ name: 'fixture-firebase', setup(builder) {
       builder.onResolve({ filter: /^\.\.\/lib\/firebase$/ }, () => ({ path: 'firebase', namespace: 'fixture' }));
       builder.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: 'export const auth = globalThis.fixture.auth; export const onAuthStateChanged = globalThis.fixture.onAuthStateChanged;' }));
@@ -47,7 +47,7 @@ async function clientFixture(disabled: boolean | undefined, signedIn: boolean) {
 }
 
 for (const signedIn of [false, true]) {
-  test(`Base44 static Drive stays unavailable with zero external operations (${signedIn ? 'signed in' : 'signed out'})`, async () => {
+  test(`explicit disabled fallback stays unavailable with zero external operations (${signedIn ? 'signed in' : 'signed out'})`, async () => {
     const { client, calls, setSignedIn } = await clientFixture(true, signedIn);
     const views: DriveBackupView[] = [];
     const unsubscribe = client.subscribeDriveBackup(view => views.push(view));
@@ -109,6 +109,37 @@ test('ordinary signed-out behavior is retained when the flag is false', async ()
 
 test('Base44 build is frontend-only and the normal build retains the Express bundle', async () => {
   const { scripts } = JSON.parse(await readFile('package.json', 'utf8'));
-  assert.equal(scripts['build:base44'], 'VITE_DRIVE_BACKUP_DISABLED=true vite build --outDir dist-base44');
+  assert.equal(scripts['build:base44'], 'VITE_DRIVE_BACKUP_DISABLED=true VITE_DRIVE_BACKUP_MODE=browser vite build --outDir dist-base44');
   assert.match(scripts.build, /vite build && esbuild server\.ts/);
+});
+
+test('browser mode routes every operation to the per-user client without Express requests', async () => {
+  const calls: string[] = [];
+  const fakeStatus = { configured: true, connected: false, message: 'Connect your own account.' };
+  const browserDriveClient = {
+    subscribe(listener: (view: unknown) => void) { calls.push('subscribe'); listener({ status: fakeStatus, result: null, busy: false }); return () => {}; },
+    getStatus: async () => { calls.push('status'); return fakeStatus; },
+    connect: async () => { calls.push('connect'); },
+    disconnect: async () => { calls.push('disconnect'); return fakeStatus; },
+    enqueue: async () => { calls.push('enqueue'); return { status: 'disconnected', message: 'Connect first.' }; },
+    cancel: () => { calls.push('cancel'); },
+  };
+  const bundled = await build({ entryPoints: ['src/utils/driveBackup.ts'], bundle: true, write: false, format: 'cjs', platform: 'browser',
+    define: { 'import.meta.env.VITE_DRIVE_BACKUP_DISABLED': 'true', 'import.meta.env.VITE_DRIVE_BACKUP_MODE': '"browser"' },
+    plugins: [{ name: 'browser-client-fixture', setup(builder) {
+      builder.onResolve({ filter: /^\.\.\/lib\/firebase$/ }, () => ({ path: 'firebase', namespace: 'fixture' }));
+      builder.onResolve({ filter: /^\.\/browserDriveClient$/ }, () => ({ path: 'browser', namespace: 'fixture' }));
+      builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path === 'firebase' ? 'export const auth = { currentUser: null }; export const onAuthStateChanged = () => () => {};' : 'export const browserDriveClient = globalThis.browserClient;' }));
+    } }],
+  });
+  const module = { exports: {} as DriveClient };
+  runInNewContext(bundled.outputFiles[0].text, { module, exports: module.exports, browserClient: browserDriveClient, fetch: () => { throw Error('No Express or Google calls in routing fixture.'); } });
+  const client = module.exports;
+  client.subscribeDriveBackup(() => {});
+  assert.equal((await client.getDriveBackupStatus()).configured, true);
+  await client.connectDriveBackup();
+  assert.equal((await client.enqueueDriveBackup(savedInput())).status, 'disconnected');
+  await client.disconnectDriveBackup();
+  client.cancelPendingDriveBackups();
+  assert.deepEqual(calls, ['subscribe', 'status', 'connect', 'enqueue', 'disconnect', 'cancel']);
 });
