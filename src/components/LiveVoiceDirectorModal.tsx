@@ -140,7 +140,7 @@ export const LiveVoiceDirectorModal: React.FC<LiveVoiceDirectorModalProps> = ({
     }
   };
 
-  const handleDisconnect = () => {
+  function handleDisconnect() {
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
