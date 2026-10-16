@@ -14,15 +14,17 @@ const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT) || 3000;
 
-// Initialize Google GenAI on the server
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    },
-  },
-});
+// Provider tools are optional; local planning must boot without credentials.
+let ai: GoogleGenAI;
+function initializeProvider(): boolean {
+  if (!process.env.GEMINI_API_KEY) return false;
+  ai ??= new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY,
+    httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
+  });
+  return true;
+}
+const providerUnavailable = 'Provider tools are not configured. Local prompt planning, Save and Load remain available.';
 
 function formatGeminiError(err: any): { error: string; isBillingError: boolean; billingUrl?: string } {
   const errMsg = err?.message || (typeof err === 'string' ? err : JSON.stringify(err));
@@ -55,6 +57,14 @@ async function startServer() {
 
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+  app.use('/api/gemini', (_req, res, next) => {
+    if (!initializeProvider()) {
+      res.status(503).json({ error: providerUnavailable });
+      return;
+    }
+    next();
+  });
 
   // ==========================================
   // 1. Image Creation & Editing (gemini-3.1-flash-image-preview)
@@ -437,6 +447,11 @@ async function startServer() {
     let session: any = null;
 
     try {
+      if (!initializeProvider()) {
+        clientWs.send(JSON.stringify({ error: providerUnavailable }));
+        clientWs.close();
+        return;
+      }
       session = await ai.live.connect({
         model: 'gemini-3.8-live',
         config: {
