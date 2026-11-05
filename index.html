@@ -3,6 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" href="data:," />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#C99C62" />
+    <link rel="apple-touch-icon" href="/icon-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Glam, Camera, Action!</title>
     <meta name="description" content="Three scenes. Three scripts. One video-ready story. Your creative production studio for connected scenes, scripts, and visual direction." />
@@ -11,10 +16,24 @@
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
 
+    <meta name="apple-mobile-web-app-title" content="Glam, Camera, Action!" />
   </head>
   <body class="bg-[#F4F0E8] text-[#252923] antialiased selection:bg-[#C99C62] selection:text-black min-h-screen">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+  <div id="installBar" style="position:fixed;left:12px;right:12px;bottom:12px;z-index:2147483000;display:none;align-items:center;gap:10px;padding:12px 14px;border-radius:16px;background:#111;color:#fff;font:600 14px system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.35)"><b style="flex:1">📲 Install Glam, Camera, Action! on your phone</b><button id="installGo" style="border:0;border-radius:10px;padding:9px 14px;font-weight:800;cursor:pointer;background:#C99C62;color:#fff">Install</button><button id="installX" aria-label="Close" style="border:0;border-radius:10px;padding:9px 14px;font-weight:800;cursor:pointer;background:transparent;color:#fff;opacity:.7">✕</button></div>
+    <div id="iosTip" style="display:none;position:fixed;left:12px;right:12px;bottom:12px;z-index:2147483001;background:#fff;color:#111;border-radius:16px;padding:16px;font:500 15px system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.35)"><b>Add to your Home Screen</b><br>1. Tap the <b>Share</b> button (square with an arrow) in Safari.<br>2. Choose <b>Add to Home Screen</b>.<br>3. Tap <b>Add</b>.<br><button onclick="this.parentNode.style.display='none'" style="margin-top:10px;border:0;border-radius:10px;padding:9px 14px;font-weight:800;background:#111;color:#fff">Got it</button></div>
+    <script>
+    if('serviceWorker' in navigator)addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){})});
+    (function(){var bar=document.getElementById('installBar'),go=document.getElementById('installGo'),ev=null;
+    var standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone,dismissed=false;try{dismissed=localStorage.getItem('install-x')==='1'}catch(e){}
+    if(standalone||dismissed)return;var ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
+    addEventListener('beforeinstallprompt',function(e){e.preventDefault();ev=e;bar.style.display='flex'});
+    if(ios)bar.style.display='flex';
+    go.onclick=function(){if(ev){ev.prompt();ev=null;bar.style.display='none'}else{document.getElementById('iosTip').style.display='block';bar.style.display='none'}};
+    document.getElementById('installX').onclick=function(){bar.style.display='none';try{localStorage.setItem('install-x','1')}catch(e){}};
+    addEventListener('appinstalled',function(){bar.style.display='none'});})();
+    </script>
   </body>
 </html>
 
